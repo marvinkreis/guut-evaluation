@@ -1,0 +1,10 @@
+black downgrade click==7.1.2
+flake8 add setuptools==75.2.0
+flutils add setuptools==75.2.0
+httpie add setuptools==75.2.0
+httpie downgrade urllib3<2
+isort add pylama==8.4.1
+isort downgrade setuptools==54.2.0
+sanic add gunicorn==23.0.0
+thonny add pillow==10.4.0
+pyMonet upgrade pytest==8.3.3

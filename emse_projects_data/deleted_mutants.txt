@@ -1,0 +1,119 @@
+Removed (flake8 processor.py core/ExceptionReplacer 0) and (typesystem tokenize/tokenize_yaml.py core/ExceptionReplacer 2)
+as cosmic ray raises an exception when trying to apply them.
+
+
+
+
+(guut) [5:00:16] marvin ~/temp/emse-projects/flake8/src/flake8 λ cosmic-ray apply processor.py core/ExceptionReplacer 0
+Traceback (most recent call last):
+  File "/home/marvin/workspace/guut/.venv/bin/cosmic-ray", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/cli.py", line 285, in main
+    return cli(argv)
+           ^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/cli.py", line 223, in apply
+    apply_mutation(Path(module_path), cosmic_ray.plugins.get_operator(operator)(), occurrence)
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 131, in apply_mutation
+    return MutationVisitor.mutate_path(module_path, operator, occurrence)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 184, in mutate_path
+    mutated_code = cls.mutate_code(original_code, operator, occurrence)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 164, in mutate_code
+    mutated_ast = visitor.walk(ast)
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 28, in walk
+    node.children = [child for child in walked if child is not None]
+                                        ^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 28, in walk
+    node.children = [child for child in walked if child is not None]
+                                        ^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 28, in walk
+    node.children = [child for child in walked if child is not None]
+                                        ^^^^^^
+  [Previous line repeated 6 more times]
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 21, in walk
+    node = self.visit(node)
+           ^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 210, in visit
+    node = self.operator.mutate(node, index)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/operators/exception_replacer.py", line 24, in mutate
+    name_nodes[index].value = CosmicRayTestingException.__name__
+    ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'PythonNode' object has no attribute 'value'
+
+
+
+
+
+(guut) [4:59:20] marvin ~/temp/emse-projects/typesystem/typesystem master λ cosmic-ray apply tokenize/tokenize_yaml.py core/ExceptionReplacer 2
+Traceback (most recent call last):
+  File "/home/marvin/workspace/guut/.venv/bin/cosmic-ray", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/cli.py", line 285, in main
+    return cli(argv)
+           ^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/click/core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/cli.py", line 223, in apply
+    apply_mutation(Path(module_path), cosmic_ray.plugins.get_operator(operator)(), occurrence)
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 131, in apply_mutation
+    return MutationVisitor.mutate_path(module_path, operator, occurrence)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 184, in mutate_path
+    mutated_code = cls.mutate_code(original_code, operator, occurrence)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 164, in mutate_code
+    mutated_ast = visitor.walk(ast)
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 28, in walk
+    node.children = [child for child in walked if child is not None]
+                                        ^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 28, in walk
+    node.children = [child for child in walked if child is not None]
+                                        ^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 28, in walk
+    node.children = [child for child in walked if child is not None]
+                                        ^^^^^^
+  [Previous line repeated 1 more time]
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/ast/__init__.py", line 21, in walk
+    node = self.visit(node)
+           ^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/mutating.py", line 210, in visit
+    node = self.operator.mutate(node, index)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/guut/.venv/lib/python3.12/site-packages/cosmic_ray/operators/exception_replacer.py", line 24, in mutate
+    name_nodes[index].value = CosmicRayTestingException.__name__
+    ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'PythonNode' object has no attribute 'value'

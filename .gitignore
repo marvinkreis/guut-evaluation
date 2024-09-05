@@ -1,0 +1,6 @@
+__pycache__
+.ipynb_checkpoints
+/emse_projects/
+/old_benchmark_data/
+/pynguin_emse_results/
+/pynguin_emse_tests/
