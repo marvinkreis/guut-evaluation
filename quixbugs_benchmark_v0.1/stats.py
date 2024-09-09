@@ -7,7 +7,7 @@ import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
 
-RESULTS_DIR = Path("./quixbugs_benchmark_v0.1")
+RESULTS_DIR = Path("/path/to/quixbugs_benchmark_v0.1")
 
 pd.set_option("display.width", 120)
 
@@ -27,23 +27,19 @@ for root, dirs, files in RESULTS_DIR.walk():
             result["implementation"] = "loop"
         results_json.append(result)
 
+# Sort!
+results_json.sort(key=lambda result: (result["implementation"], result["problem"]["name"], result["id"]))
+
 data = pd.json_normalize(results_json)
 
 # %% Compute token usage
 
-prompt_tokens = [
-    sum(msg["usage"]["prompt_tokens"] for msg in result["conversation"] if msg["role"] == "assistant")
-    for result in results_json
-]
-completion_tokens = [
-    sum(msg["usage"]["completion_tokens"] for msg in result["conversation"] if msg["role"] == "assistant")
-    for result in results_json
-]
-problem_names = [result["problem"]["name"] for result in results_json]
-implementations = [result["implementation"] for result in results_json]
-
-data["usage.prompt_tokens"] = prompt_tokens
-data["usage.completion_tokens"] = completion_tokens
+data["usage.prompt_tokens"] = data["conversation"].map(
+    lambda c: sum(msg["usage"]["prompt_tokens"] for msg in c if msg["role"] == "assistant")
+)
+data["usage.completion_tokens"] = data["conversation"].map(
+    lambda c: sum(msg["usage"]["completion_tokens"] for msg in c if msg["role"] == "assistant")
+)
 data["usage.total_tokens"] = data["usage.prompt_tokens"] + data["usage.completion_tokens"]
 
 # Add cost in $ for gpt4o-mini
@@ -55,19 +51,23 @@ data["usage.cost"] = (data["usage.prompt_tokens"] * 0.150 / 1_000_000) + (
 
 # %% Count messages, observations, experiments, tests
 
-num_turns = [len([msg for msg in result["conversation"] if msg["role"] == "assistant"]) for result in results_json]
-num_observations = [
-    len([exp for exp in result["experiments"] if exp["kind"] == "observation"]) for result in results_json
-]
-num_experiments = [
-    len([exp for exp in result["experiments"] if exp["kind"] == "experiment"]) for result in results_json
-]
-num_tests = [len(result["tests"]) for result in results_json]
-
-data["num_turns"] = num_turns
-data["num_observations"] = num_observations
-data["num_experiments"] = num_experiments
-data["num_tests"] = num_tests
+data["num_turns"] = data["conversation"].map(lambda conv: len([msg for msg in conv if msg["role"] == "assistant"]))
+data["num_observations"] = data["experiments"].map(
+    lambda exps: len([exp for exp in exps if exp["kind"] == "observation"])
+)
+data["num_experiments"] = data["experiments"].map(
+    lambda exps: len([exp for exp in exps if exp["kind"] == "experiment"])
+)
+data["num_tests"] = data["tests"].map(len)
+data["num_invalid_observations"] = data["experiments"].map(
+    lambda exps: len([exp for exp in exps if exp["kind"] == "observation" and not exp["validation_result"]["valid"]])
+)
+data["num_invalid_experiments"] = data["experiments"].map(
+    lambda exps: len([exp for exp in exps if exp["kind"] == "experiment" and not exp["validation_result"]["valid"]])
+)
+data["num_invalid_tests"] = data["tests"].map(
+    lambda tests: len([test for test in tests if not test["validation_result"]["valid"]])
+)
 
 # %% Compute counts of message types
 
@@ -85,35 +85,46 @@ relevant_msg_tags = [
     "aborted",
 ]
 
-tag_counts = {
-    tag: [sum([msg["tag"] == tag for msg in result["conversation"]]) for result in results_json]
-    for tag in relevant_msg_tags
-}
-
-for tag_name in relevant_msg_tags:
-    data[f"tag.{tag_name}"] = tag_counts[tag_name]
+for tag in relevant_msg_tags:
+    data[f"tag.{tag}"] = data["conversation"].map(lambda conv: len([msg for msg in conv if msg["tag"] == tag]))
 
 # %% Compute test LOC
 
 
 def estimate_loc(test):
     if test is None:
-        return 0
+        return None
     return len([line for line in test["code"].splitlines() if line.strip() and not line.strip().startswith("#")])
 
 
-def find_killing_test(result):
-    killing_tests = [test for test in result["tests"] if test["kills_mutant"]]
+def find_killing_test(tests):
+    killing_tests = [test for test in tests if test["kills_mutant"]]
     return killing_tests[0] if killing_tests else None
 
 
-test_loc = [estimate_loc(find_killing_test(result)) for result in results_json]
+data["test_loc"] = data["tests"].map(lambda tests: estimate_loc(find_killing_test(tests)))
 
-data["test_loc"] = test_loc
+# %% Compute number of import errors
 
-# %% Sort data!
 
-data = data.sort_values(["implementation", "problem.name", "timestamp"])
+def count_import_errors(exps_or_tests):
+    return len(
+        [
+            exp
+            for exp in exps_or_tests
+            if exp["result"]
+            and "ModuleNotFoundError" in (exp["result"].get("test") or exp["result"].get("correct"))["output"]
+        ]
+    )
+
+
+data["num_observation_import_errors"] = data["experiments"].map(
+    lambda exps: count_import_errors([exp for exp in exps if exp["kind"] == "observation"])
+)
+data["num_experiment_import_errors"] = data["experiments"].map(
+    lambda exps: count_import_errors([exp for exp in exps if exp["kind"] == "experiment"])
+)
+data["num_test_import_errors"] = data["tests"].map(lambda tests: count_import_errors(tests))
 
 # %% Token usage mean
 
@@ -135,6 +146,10 @@ ax.tick_params(axis="x", rotation=90)
 ax.yaxis.set_major_formatter(plt.FormatStrFormatter("%.3f$"))
 ax.legend(loc="upper left")
 plt.show()
+
+# %% Mean number of turns per task
+
+data.groupby("implementation")["num_turns"].mean()
 
 # %% Number of turns per task
 
@@ -158,6 +173,10 @@ data[data["implementation"] == "loop"].plot.bar(
     figsize=(15, 8),
 )
 plt.show()
+
+# %% Number of observations / experiments / tests in total
+
+data.groupby("implementation")[["num_observations", "num_experiments", "num_tests"]].sum()
 
 # %% Success rate
 
@@ -183,4 +202,51 @@ data[data["tag.aborted"] > 0][["implementation", "problem.name", "id"]]
 
 data[data["tag.claimed_equivalent"] > 0][["implementation", "problem.name", "id"]]
 
+# %% Non compilable experiments / tests
+
+data.groupby("implementation")[["num_invalid_observations", "num_invalid_experiments", "num_invalid_tests"]].sum()
+
+# %% Tasks with import errors
+
+data[
+    (data["num_observation_import_errors"] + data["num_experiment_import_errors"] + data["num_test_import_errors"]) > 0
+][["implementation", "problem.name", "id", "num_test_import_errors"]]
+
 # %% Coverage
+
+import sys
+
+sys.path.insert(0, "/path/to/guut")
+from guut.quixbugs import QuixbugsProblem
+
+coverage_values = []
+for result in results_json:
+    print(result["problem"]["name"])
+    problem = QuixbugsProblem(
+        result["problem"]["name"], python_interpreter=Path("/path/to/venv/bin/python")
+    )
+    if not result["mutant_killed"]:
+        coverage_values.append((None, None))
+    else:
+        killing_test = [test for test in result["tests"] if test["kills_mutant"]][0]
+        execution_result = problem.run_test(killing_test["code"], collect_coverage=True)
+        coverage = execution_result.correct.coverage
+        assert coverage is not None
+        print((len(coverage.covered_lines), len(coverage.missing_lines)))
+        coverage_values.append((len(coverage.covered_lines), len(coverage.missing_lines)))
+
+data["coverage.covered"] = [c[0] for c in coverage_values]
+data["coverage.missing"] = [c[1] for c in coverage_values]
+data["coverage"] = data["coverage.covered"] / (data["coverage.missing"] + data["coverage.covered"])
+
+# %% Mean coverage (baseline)
+
+data["coverage"][data["coverage"] != np.nan][data["implementation"] == "baseline"].mean()
+
+# %% Mean coverage (loop)
+
+data["coverage"][data["coverage"] != np.nan][data["implementation"] == "loop"].mean()
+
+# %% Tasks with less than 100% coverage
+
+data[data["coverage"] < 1.0][["id", "coverage.missing", "coverage.covered", "coverage", "mutant_killed"]]
