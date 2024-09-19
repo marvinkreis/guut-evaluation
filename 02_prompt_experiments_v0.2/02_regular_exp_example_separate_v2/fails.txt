@@ -1,0 +1,10 @@
+Manually reading the first experiment reveals that the LLM misunderstood the experiment format for:
+- find_in_sorted
+- breadth_first_search
+- gcd
+- hanoi
+- is_valid_parenthesization
+- longest_common_subsequence
+- possible_change
+- shunting_yard
+- wrap

@@ -1,0 +1,13 @@
+Manually reading the first experiment reveals that the LLM misunderstood the experiment format for:
+- depth_first_search
+- detect_cycle
+- get_factors
+- kheapsort
+- lis
+- max_sublist_sum
+- next_permutation
+- possible_change
+- powerset
+- quicksort
+- sqrt
+- to_base
