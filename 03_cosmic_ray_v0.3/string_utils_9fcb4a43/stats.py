@@ -40,8 +40,60 @@ data = pd.json_normalize(results_json)
 
 con = sqlite3.connect(SESSION_FILE)
 cur = con.cursor()
-cur.execute("select * from mutation_specs;")
+cur.execute(
+    "select module_path, operator_name, occurrence, start_pos_row, end_pos_row from mutation_specs;"
+)
 mutants = cur.fetchall()
+
+# %% Load mutant line info into the table
+
+mutant_lines = {(m[0], m[1], m[2]): (m[3], m[4]) for m in mutants}
+data["mutant_lines"] = data.apply(
+    lambda row: mutant_lines[
+        (
+            row["problem.target_path"],
+            row["problem.mutant_op"],
+            row["problem.occurrence"],
+        )
+    ],
+    axis=1,
+)
+data["mutant_lines.start"] = data["mutant_lines"].map(lambda t: t[0])
+data["mutant_lines.end"] = data["mutant_lines"].map(lambda t: t[1])
+
+
+# Check whether each run covers the mutant
+
+
+def experiment_covers_mutant(row):
+    start, end = row["mutant_lines"]
+    mutant_lines = set(range(start, end + 1))
+    experiments = row["experiments"]
+    return any(
+        set(exp["result"]["test"]["coverage"]["covered_lines"]).intersection(
+            mutant_lines
+        )
+        for exp in experiments
+        if exp["result"] and exp["result"]["test"]["coverage"]
+    )
+
+
+def test_covers_mutant(row):
+    start, end = row["mutant_lines"]
+    mutant_lines = set(range(start, end + 1))
+    tests = row["tests"]
+    return any(
+        set(test["result"]["correct"]["coverage"]["covered_lines"]).intersection(
+            mutant_lines
+        )
+        for test in tests
+        if test["result"] and test["result"]["correct"]["coverage"]
+    )
+
+
+data["experiment_covers_mutant"] = data.apply(experiment_covers_mutant, axis=1)
+data["test_covers_mutant"] = data.apply(test_covers_mutant, axis=1)
+data["mutant_covered"] = data["experiment_covers_mutant"] | data["test_covers_mutant"]
 
 # %% Compute coverage
 
@@ -318,7 +370,7 @@ plt.show()
 
 data["num_turns"].mean()
 
-# %%
+# %% Mutants with max turns
 
 data[data["num_turns"] == 16][
     ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
@@ -399,6 +451,52 @@ print(f"Alive mutants: {num_mutants - total_kills}")
 
 data["usage.cost"].sum() / total_kills
 
-# %% Number of loops
+# %% Compute outcome for simplicity
 
-len(data)
+
+SUCCESS = "success"
+EQUIVALENT = "equivalent"
+FAIL = "fail"
+
+
+def get_outcome(row):
+    if row["mutant_killed"]:
+        return SUCCESS
+    elif row["claimed_equivalent"]:
+        return EQUIVALENT
+    else:
+        return FAIL
+
+
+data["outcome"] = data.apply(get_outcome, axis=1).to_frame(name="outcome")
+
+# %% Number of runs peere outcome
+
+print(f"Total runs: {len(data)}")
+print(f"Successful runs: {len(data[data["outcome"] == "success"])}")
+print(f"Equivalent runs: {len(data[data["outcome"] == "equivalent"])}")
+print(f"Failed runs: {len(data[data["outcome"] == "fail"])}")
+
+print(f"Total runs that cover the mutant: {len(data[data["mutant_covered"]])}")
+print(
+    f"Successful runs that cover the mutant: {len(data[(data["outcome"] == SUCCESS) & data["mutant_covered"]])}"
+)
+print(
+    f"Equivalent runs that cover the mutant: {len(data[(data["outcome"] == EQUIVALENT) & data["mutant_covered"]])}"
+)
+print(
+    f"Failed runs that cover the mutant: {len(data[(data["outcome"] == FAIL) & data["mutant_covered"]])}"
+)
+# %% Successful runs that don't cover the mutant?
+
+data[(data["outcome"] == "success") & (~data["mutant_covered"])][
+    ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
+]
+
+# %% Number of runs
+
+import plotly.express as px
+
+data["color"] = data["mutant_covered"].map(lambda b: "green" if b else "red")
+fig = px.parallel_categories(data, ["outcome", "mutant_covered"], color="color")
+fig.write_html("/mnt/temp/coverage.html", auto_open=True)
