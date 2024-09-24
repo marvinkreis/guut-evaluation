@@ -424,6 +424,24 @@ data[data["tag.claimed_equivalent"] > 0][
     ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
 ]
 
+
+# %% Number of experiments / tests before equivalence is claimed
+
+data[data["tag.claimed_equivalent"] > 0][["num_tests", "num_experiments"]].mean()
+
+
+# %% Sample of equivalences
+
+data[data["tag.claimed_equivalent"] > 0].sample(n=20, random_state=1)[
+    [
+        "implementation",
+        "problem.target_path",
+        "problem.mutant_op",
+        "problem.occurrence",
+        "id",
+    ]
+].to_csv("/mnt/temp/samples.csv")
+
 # %% Non compilable experiments / tests
 
 data.groupby("implementation")[["num_invalid_experiments", "num_invalid_tests"]].sum()

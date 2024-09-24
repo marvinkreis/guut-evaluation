@@ -1,0 +1,15 @@
+loop:
+    - only killing tests (123 tests): surviving mutants: 176 (15.69%)
+    - all valid tests (309 tests): surviving mutants: 172 (15.33%)
+
+baseline:
+    - only killing tests (96 tests): surviving mutants: 170 (15.15%)
+    - all last valid tests (249 tests): surviving mutants: 158 (14.08%)
+        - wasn't able to do all valid tests, since executing > 1000 tests took to long
+
+baseline2 (no iterations):
+    - only killing tests (77 tests): surviving mutants: 232 (20.68%)
+    - all valid tests (190 tests): surviving mutants: 216 (19.25%)
+
+original, handwritten test suite (407 tests):
+    - all tests: surviving mutants: 174 (15.51%)

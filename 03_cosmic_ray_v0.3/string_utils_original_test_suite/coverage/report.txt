@@ -1,0 +1,10 @@
+Name                           Stmts   Miss  Cover
+--------------------------------------------------
+string_utils/__init__.py           4      0   100%
+string_utils/_regex.py            30      0   100%
+string_utils/errors.py             6      0   100%
+string_utils/generation.py        50      0   100%
+string_utils/manipulation.py     201      0   100%
+string_utils/validation.py       152      0   100%
+--------------------------------------------------
+TOTAL                            443      0   100%
