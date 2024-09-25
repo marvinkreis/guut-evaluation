@@ -1,0 +1,13 @@
+Summary
+
+My Approach:
+- The LLM can fail to kill trivial mutants, because it assumes that the experiment failed when the mutant raises an error.
+- The LLM sometimes has an entirely wrong approach for detecting the mutant. This might be due to inherent randomness. E.g.
+    - testing the wrong method
+    - not supplying an optional parameter that's needed to detect the mutant
+    - supplying a parameter that has to be omitted to detect the mutant
+
+Baseline:
+- The baseline approach almost always gets the imports wrong on the first try.
+
+
