@@ -1,0 +1,51 @@
+,implementation,problem.target_path,problem.mutant_op,problem.occurrence,mutant_killed,id,
+294,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Div,7,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Div_7_52c1417,"Mutant fails on import. LLM acknowledges this, then generates a test with an error, then fixes it first try."
+585,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Div,7,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Div_7_99fa759a,"Mutant fails on import. LLM fails to import the mutant, only trying a wrong path. Then recreates the mutant instead."
+32,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Div,9,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Div_9_b9e8df8a,"Mutant fails on import. LLM acknowledges this, then generates a test that is wrong but accidentally works."
+551,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Div,9,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Div_9_1adaa27a,Mutant fails on import. LLM only generates tests that fail on the correct version too.
+264,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Div,12,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Div_12_fa2618a7,"Mutant fails on import. LLM takes a couple of experiments to realize the imported ""PRETTIFY_RE"" is a dict of regexes and not the regex, but it makes its way there."
+649,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Div,12,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Div_12_4ba5b784,"Mutant fails on import. LLM fails to import the mutant, only trying a wrong path. Then recreates the mutant instead."
+161,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_FloorDiv,3,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_FloorDiv_3_cd2d76f,"LLM first hypothesizes that the mutant will fail on import, the hypothesizes about parsing different HTML tags, trying different outputs each time. Very nice!"
+602,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_FloorDiv,3,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_FloorDiv_3_e772d1c7,"LLM fails to construct an error-free test case, trying more inputs and more complex inputs with each attempt (which is not helping)."
+181,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_FloorDiv,4,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_FloorDiv_4_754ead71,"LLM first hypothesizes that the mutant will fail on import, then hypothesizes about parsing multiline HTML tags, which is the right idea. It takes a couple of experiments to get there, because it omits the imports in two of them. Then takes some attempts to convert the experiment into a test. The LLM actually interleaves experiments and tests here."
+611,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_FloorDiv,4,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_FloorDiv_4_c24b7513,"LLM doesn't find the inputs, trying more or less the same ones (with minor changes) each attempt."
+170,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Mod,0,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Mod_0_8dfee91,"LLM first hypothesizes that the mutant will fail on import, then tries a complex JSON input and creates the test."
+454,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Mod,0,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Mod_0_88b3c335,"LLM fails to construct an error-free test case, trying more inputs and more complex inputs with each attempt (which is not helping, again)."
+146,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Mod,6,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Mod_6_62b5ffa7,
+428,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Mod,6,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Mod_6_5ec5c3bb,
+249,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,6,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_6_fc7fa624,
+651,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,6,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_6_13feffad,
+162,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,9,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_9_f14342b,
+586,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,9,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_9_4dd41430,
+188,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,10,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_10_536a6b82,
+637,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,10,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_10_6c5e9c7,
+39,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,11,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_11_575de790,
+600,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_Pow,11,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_Pow_11_30be9590,
+92,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_RShift,3,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_RShift_3_e425af54,
+376,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_RShift,3,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_RShift_3_2e83ef6,
+122,loop,_regex.py,core/ReplaceBinaryOperator_BitOr_RShift,5,True,string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_RShift_5_35a29473,
+652,baseline,_regex.py,core/ReplaceBinaryOperator_BitOr_RShift,5,False,baseline_string_utils__regex.py_core/ReplaceBinaryOperator_BitOr_RShift_5_2912848d,
+229,loop,generation.py,core/NumberReplacer,10,True,string_utils_generation.py_core/NumberReplacer_10_1cb038db,normal
+481,baseline,generation.py,core/NumberReplacer,10,False,baseline_string_utils_generation.py_core/NumberReplacer_10_46cff2a9,LLM first fails to import correcly. Then messes up the test by adding unnecessary calls to the target function that throw exceptions for both versions.
+289,loop,generation.py,core/ReplaceBinaryOperator_Add_LShift,1,True,string_utils_generation.py_core/ReplaceBinaryOperator_Add_LShift_1_63676921,
+578,baseline,generation.py,core/ReplaceBinaryOperator_Add_LShift,1,False,baseline_string_utils_generation.py_core/ReplaceBinaryOperator_Add_LShift_1_7f7460f9,
+183,loop,generation.py,core/ReplaceComparisonOperator_Lt_Eq,5,True,string_utils_generation.py_core/ReplaceComparisonOperator_Lt_Eq_5_92a6f459,
+436,baseline,generation.py,core/ReplaceComparisonOperator_Lt_Eq,5,False,baseline_string_utils_generation.py_core/ReplaceComparisonOperator_Lt_Eq_5_61d18570,
+268,loop,generation.py,core/ReplaceFalseWithTrue,0,True,string_utils_generation.py_core/ReplaceFalseWithTrue_0_7c4131e,
+621,baseline,generation.py,core/ReplaceFalseWithTrue,0,False,baseline_string_utils_generation.py_core/ReplaceFalseWithTrue_0_51b63f60,
+313,loop,manipulation.py,core/NumberReplacer,7,True,string_utils_manipulation.py_core/NumberReplacer_7_5aa4374a,
+447,baseline,manipulation.py,core/NumberReplacer,7,False,baseline_string_utils_manipulation.py_core/NumberReplacer_7_76ddc71,
+62,loop,manipulation.py,core/NumberReplacer,96,True,string_utils_manipulation.py_core/NumberReplacer_96_90cba68a,
+598,baseline,manipulation.py,core/NumberReplacer,96,False,baseline_string_utils_manipulation.py_core/NumberReplacer_96_7ffde67,
+222,loop,manipulation.py,core/ReplaceFalseWithTrue,0,True,string_utils_manipulation.py_core/ReplaceFalseWithTrue_0_268a46de,
+500,baseline,manipulation.py,core/ReplaceFalseWithTrue,0,False,baseline_string_utils_manipulation.py_core/ReplaceFalseWithTrue_0_3e268d4,
+7,loop,manipulation.py,core/ReplaceUnaryOperator_Delete_Not,16,True,string_utils_manipulation.py_core/ReplaceUnaryOperator_Delete_Not_16_e5969b1f,
+404,baseline,manipulation.py,core/ReplaceUnaryOperator_Delete_Not,16,False,baseline_string_utils_manipulation.py_core/ReplaceUnaryOperator_Delete_Not_16_8fc457c,
+128,loop,validation.py,core/ReplaceComparisonOperator_Eq_GtE,3,True,string_utils_validation.py_core/ReplaceComparisonOperator_Eq_GtE_3_8a487c31,
+396,baseline,validation.py,core/ReplaceComparisonOperator_Eq_GtE,3,False,baseline_string_utils_validation.py_core/ReplaceComparisonOperator_Eq_GtE_3_f1d1d291,
+190,loop,validation.py,core/ReplaceComparisonOperator_IsNot_Is,4,True,string_utils_validation.py_core/ReplaceComparisonOperator_IsNot_Is_4_5ac6f6a7,
+564,baseline,validation.py,core/ReplaceComparisonOperator_IsNot_Is,4,False,baseline_string_utils_validation.py_core/ReplaceComparisonOperator_IsNot_Is_4_b996a6b9,
+112,loop,validation.py,core/ReplaceFalseWithTrue,8,True,string_utils_validation.py_core/ReplaceFalseWithTrue_8_bebe5e26,
+587,baseline,validation.py,core/ReplaceFalseWithTrue,8,False,baseline_string_utils_validation.py_core/ReplaceFalseWithTrue_8_9cc903e,
+194,loop,validation.py,core/ReplaceFalseWithTrue,14,True,string_utils_validation.py_core/ReplaceFalseWithTrue_14_2eb7c49,
+528,baseline,validation.py,core/ReplaceFalseWithTrue,14,False,baseline_string_utils_validation.py_core/ReplaceFalseWithTrue_14_97efbcc,

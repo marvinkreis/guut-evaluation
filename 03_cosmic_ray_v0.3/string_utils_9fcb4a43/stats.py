@@ -440,7 +440,7 @@ data[data["tag.claimed_equivalent"] > 0].sample(n=20, random_state=1)[
         "problem.occurrence",
         "id",
     ]
-].to_csv("/mnt/temp/samples.csv")
+]
 
 # %% Non compilable experiments / tests
 

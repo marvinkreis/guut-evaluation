@@ -7,9 +7,9 @@ import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
 
-RESULTS_DIR = Path("/home/marvin/workspace/guut-evaluation/quixbugs_benchmark_v0.1")
+RESULTS_DIR = Path("/home/marvin/workspace/guut-evaluation/01_initial_benchmark_v0.1")
 GUUT_PATH = "/home/marvin/workspace/guut"
-PYTHON_INTERPRETER_PATH = "/home/marvin/workspace/guut/venv"
+PYTHON_INTERPRETER_PATH = "/home/marvin/workspace/guut/.venv"
 
 pd.set_option("display.width", 120)
 

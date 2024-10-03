@@ -124,8 +124,6 @@ print(f"Alive mutants: {num_mutants - total_kills}")
 
 
 x = data[(data["implementation"] == "baseline2") & data["mutant_killed"]]
-# x[x["coverage.covered_lines"].map(bool) | x["coverage.missing_lines"].map(bool)]
-
 
 y = x["coverage.covered_lines_num"] / (
     x["coverage.covered_lines_num"] + x["coverage.missing_lines_num"]
@@ -133,7 +131,7 @@ y = x["coverage.covered_lines_num"] / (
 
 np.reshape(y, (len(y),)).mean()
 
-# %% Find mutants which the loop didn't kill but baseline did
+# %% Find killed and unkilled mutants per approach
 
 
 def mutant_id(row):
@@ -150,14 +148,42 @@ baseline_data = data[(data["implementation"] == "baseline")]
 loop_failed_mutants = set(
     loop_data[~loop_data["mutant_killed"]].apply(mutant_id, axis=1)
 )
+loop_successful_mutants = set(
+    loop_data[loop_data["mutant_killed"]].apply(mutant_id, axis=1)
+)
+baseline_failed_mutants = set(
+    baseline_data[~baseline_data["mutant_killed"]].apply(mutant_id, axis=1)
+)
 baseline_successful_mutants = set(
     baseline_data[baseline_data["mutant_killed"]].apply(mutant_id, axis=1)
 )
+
+# %% Get mutants that the baseline killed but loop didn't
 
 print(len(loop_failed_mutants))
 print(len(baseline_successful_mutants))
 
 target_mutants = loop_failed_mutants.intersection(baseline_successful_mutants)
+
+x = data[data["implementation"] != "baseline2"]
+x[x.apply(mutant_id, axis=1).map(lambda id: id in target_mutants)][
+    [
+        "implementation",
+        "problem.target_path",
+        "problem.mutant_op",
+        "problem.occurrence",
+        "mutant_killed",
+        "id",
+    ]
+].sort_values(["problem.target_path", "problem.mutant_op", "problem.occurrence"])
+
+
+# %% Get mutants that the loop killed but baseline didn't
+
+print(len(baseline_failed_mutants))
+print(len(loop_successful_mutants))
+
+target_mutants = baseline_failed_mutants.intersection(loop_successful_mutants)
 
 x = data[data["implementation"] != "baseline2"]
 x[x.apply(mutant_id, axis=1).map(lambda id: id in target_mutants)][
