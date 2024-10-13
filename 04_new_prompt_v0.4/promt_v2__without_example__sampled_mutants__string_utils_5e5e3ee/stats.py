@@ -1,24 +1,25 @@
 # %% Imports, constants and helpers
 
+from functools import partial
 import json
 from pathlib import Path
 import sqlite3
-from typing import List
+from typing import List, Literal, Union
 
 import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
+import os
 
-RESULTS_DIR = Path(
-    "/home/marvin/workspace/guut-evaluation/04_new_prompt_v0.4/promt_v2__without_example__sampled_mutants__string_utils_5e5e3ee/loops"
-)
-SESSION_FILE = Path(
-    "/home/marvin/workspace/guut-evaluation/emse_projects/mutants_sampled/python-string-utils.sqlite"
-)
+pd.set_option("display.width", None)
+pd.set_option("display.max_colwidth", None)
 
-pd.set_option("display.width", 120)
+RESULTS_DIR = Path(os.getcwd()) / "loops"
+_evaluation_dir = next(iter([path for path in Path(os.getcwd()).parents if path.name == "guut-evaluation"]))
+SESSION_FILE = Path(_evaluation_dir) / "emse_projects/mutants_sampled/python-string-utils.sqlite"
 
-# %% Load json files
+
+# %% Load json result files
 
 results_json = []
 for root, dirs, files in RESULTS_DIR.walk():
@@ -40,9 +41,7 @@ data = pd.json_normalize(results_json)
 
 con = sqlite3.connect(SESSION_FILE)
 cur = con.cursor()
-cur.execute(
-    "select module_path, operator_name, occurrence, start_pos_row, end_pos_row from mutation_specs;"
-)
+cur.execute("select module_path, operator_name, occurrence, start_pos_row, end_pos_row from mutation_specs;")
 mutants = cur.fetchall()
 
 # %% Load mutant line info into the table
@@ -61,71 +60,70 @@ data["mutant_lines"] = data.apply(
 data["mutant_lines.start"] = data["mutant_lines"].map(lambda t: t[0])
 data["mutant_lines.end"] = data["mutant_lines"].map(lambda t: t[1])
 
-# %% Check whether each run covers the mutant
+# %% Helper functions
 
 
-def experiment_covers_mutant(row):
-    start, end = row["mutant_lines"]
-    mutant_lines = set(range(start, end + 1))
-    experiments = row["experiments"]
-    return any(
-        set(exp["result"]["test_correct"]["coverage"]["covered_lines"]).intersection(
-            mutant_lines
-        )
-        for exp in experiments
-        if exp["result"] and exp["result"]["test_correct"]["coverage"]
-    )
+def get_result(exp_or_test: Union["Experiment", "Test"], mutant: bool = False) -> "ExecutionResult":
+    if exp_or_test is None:
+        return None
+
+    result = exp_or_test.get("result")
+    if result is None:
+        return None
+
+    if not mutant:
+        return result.get("test_correct") or result.get("correct")
+    else:
+        return result.get("test_mutant") or result.get("mutant")
 
 
-def test_covers_mutant(row):
-    start, end = row["mutant_lines"]
-    mutant_lines = set(range(start, end + 1))
-    tests = row["tests"]
-    return any(
-        set(test["result"]["correct"]["coverage"]["covered_lines"]).intersection(
-            mutant_lines
-        )
-        for test in tests
-        if test["result"] and test["result"]["correct"]["coverage"]
-    )
-
-
-data["experiment_covers_mutant"] = data.apply(experiment_covers_mutant, axis=1)
-data["test_covers_mutant"] = data.apply(test_covers_mutant, axis=1)
-data["mutant_covered"] = data["experiment_covers_mutant"] | data["test_covers_mutant"]
-
-# %% Compute coverage
-
-
-def find_killing_test(tests):
+def find_killing_test(tests: List["Test"]) -> "Test":
     killing_tests = [test for test in tests if test["kills_mutant"]]
     return killing_tests[0] if killing_tests else None
-
-
-def get_coverage_from_test(test):
-    if test is None:
-        return [], []
-    test_result = test.get("result")
-    if test_result is None:
-        return [], []
-    coverage = test_result["correct"].get("coverage")
-    if coverage is None:
-        return [], []
-    return coverage["covered_lines"], coverage["missing_lines"]
-
-
-data["coverage.covered_lines"] = data["tests"].map(
-    lambda tests: get_coverage_from_test(find_killing_test(tests))[0]
-)
-data["coverage.missing_lines"] = data["tests"].map(
-    lambda tests: get_coverage_from_test(find_killing_test(tests))[1]
-)
 
 
 def add_coverage(x: List[int], y: List[int]) -> List[int]:
     acc = set(x)
     acc.update(y)
     return list(acc)
+
+
+def subtract_coverage(x: List[int], y: List[int]) -> List[int]:
+    acc = set(x)
+    acc.intersection_update(y)
+    return list(acc)
+
+
+# %% Check whether each run covers the mutant
+
+
+def covers_mutant(row, experiments_or_tests: Literal["experiments", "tests"]):
+    start, end = row["mutant_lines"]
+    mutant_lines = set(range(start, end + 1))
+    return any(
+        set(coverage["covered_lines"]).intersection(mutant_lines)
+        for exp in row[experiments_or_tests]
+        if (exec_result := get_result(exp)) and (coverage := exec_result["coverage"])
+    )
+
+
+data["experiment_covers_mutant"] = data.apply(partial(covers_mutant, experiments_or_tests="experiments"), axis=1)
+data["test_covers_mutant"] = data.apply(partial(covers_mutant, experiments_or_tests="tests"), axis=1)
+data["mutant_covered"] = data["experiment_covers_mutant"] | data["test_covers_mutant"]
+
+# %% Compute coverage from killing tests
+
+
+def get_coverage_from_test(test):
+    exec_result = get_result(test)
+    if (exec_result is None) or (exec_result["coverage"] is None):
+        return [], []
+    coverage = exec_result["coverage"]
+    return coverage["covered_lines"], coverage["missing_lines"]
+
+
+data["coverage.covered_lines"] = data["tests"].map(lambda tests: get_coverage_from_test(find_killing_test(tests))[0])
+data["coverage.missing_lines"] = data["tests"].map(lambda tests: get_coverage_from_test(find_killing_test(tests))[1])
 
 
 # %% Make equivalence status easier to access
@@ -170,18 +168,12 @@ plt.show()
 # %% Compute Token Usage
 
 data["usage.prompt_tokens"] = data["conversation"].map(
-    lambda c: sum(
-        msg["usage"]["prompt_tokens"] for msg in c if msg["role"] == "assistant"
-    )
+    lambda c: sum(msg["usage"]["prompt_tokens"] for msg in c if msg["role"] == "assistant")
 )
 data["usage.completion_tokens"] = data["conversation"].map(
-    lambda c: sum(
-        msg["usage"]["completion_tokens"] for msg in c if msg["role"] == "assistant"
-    )
+    lambda c: sum(msg["usage"]["completion_tokens"] for msg in c if msg["role"] == "assistant")
 )
-data["usage.total_tokens"] = (
-    data["usage.prompt_tokens"] + data["usage.completion_tokens"]
-)
+data["usage.total_tokens"] = data["usage.prompt_tokens"] + data["usage.completion_tokens"]
 
 # Add cost in $ for gpt4o-mini
 # prompt: $0.150 / 1M input tokens
@@ -192,38 +184,29 @@ data["usage.cost"] = (data["usage.prompt_tokens"] * 0.150 / 1_000_000) + (
 
 # %% Token usage mean
 
-data.groupby("implementation")[
-    ["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]
-].mean()
+data.groupby("implementation")[["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]].mean()
 
 # %% Token usage sum
 
-data.groupby("implementation")[
-    ["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]
-].sum()
+data.groupby("implementation")[["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]].sum()
 
 # %% Count messages, experiments, tests
 
-data["num_turns"] = data["conversation"].map(
+data["num_completions"] = data["conversation"].map(
     lambda conv: len([msg for msg in conv if msg["role"] == "assistant"])
 )
-data["num_experiments"] = data["experiments"].map(
-    lambda exps: len([exp for exp in exps if exp["kind"] == "experiment"])
+data["num_equivalences"] = data["conversation"].map(
+    lambda conv: len([msg for msg in conv if msg["tag"] == "claimed_equivalent"])
 )
+data["num_experiments"] = data["experiments"].map(len)
 data["num_tests"] = data["tests"].map(len)
+data["num_turns"] = data["num_experiments"] + data["num_tests"]
+
 data["num_invalid_experiments"] = data["experiments"].map(
-    lambda exps: len(
-        [
-            exp
-            for exp in exps
-            if exp["kind"] == "experiment" and not exp["validation_result"]["valid"]
-        ]
-    )
+    lambda exps: len([exp for exp in exps if exp["kind"] == "experiment" and not exp["validation_result"]["valid"]])
 )
 data["num_invalid_tests"] = data["tests"].map(
-    lambda tests: len(
-        [test for test in tests if not test["validation_result"]["valid"]]
-    )
+    lambda tests: len([test for test in tests if not test["validation_result"]["valid"]])
 )
 
 # %% Count message types
@@ -236,16 +219,13 @@ relevant_msg_tags = [
     "test_stated",
     "test_invalid",
     "test_doesnt_detect_mutant",
-    "claimed_equivalent",
     "done",
     "incomplete_response",
     "aborted",
 ]
 
 for tag in relevant_msg_tags:
-    data[f"tag.{tag}"] = data["conversation"].map(
-        lambda conv: len([msg for msg in conv if msg["tag"] == tag])
-    )
+    data[f"tag.{tag}"] = data["conversation"].map(lambda conv: len([msg for msg in conv if msg["tag"] == tag]))
 
 
 # %% Compute test LOC
@@ -254,18 +234,10 @@ for tag in relevant_msg_tags:
 def estimate_loc(test):
     if test is None:
         return None
-    return len(
-        [
-            line
-            for line in test["code"].splitlines()
-            if line.strip() and not line.strip().startswith("#")
-        ]
-    )
+    return len([line for line in test["code"].splitlines() if line.strip() and not line.strip().startswith("#")])
 
 
-data["test_loc"] = data["tests"].map(
-    lambda tests: estimate_loc(find_killing_test(tests))
-)
+data["test_loc"] = data["tests"].map(lambda tests: estimate_loc(find_killing_test(tests)))
 
 # %% Compute number of import errors
 
@@ -275,11 +247,7 @@ def count_import_errors(exps_or_tests):
         [
             exp
             for exp in exps_or_tests
-            if exp["result"]
-            and "ModuleNotFoundError"
-            in (exp["result"].get("correct") or exp["result"].get("test_correct"))[
-                "output"
-            ]
+            if (exec_result := get_result(exp)) and "ModuleNotFoundError" in exec_result["output"]
         ]
     )
 
@@ -295,8 +263,7 @@ data["num_debugger_scripts"] = data["experiments"].map(
 
 # %% Percentage of experiments with debugger scripts
 
-loop_data = data[data["implementation"] == "loop"]
-loop_data["num_debugger_scripts"].sum() / loop_data["num_experiments"].sum()
+data["num_debugger_scripts"].sum() / data["num_experiments"].sum()
 
 
 # %% Number of turns
@@ -371,24 +338,16 @@ ax.legend(
 plt.show()
 
 
-# %% Number of turns
+# %% Mean number of turns
 
 data["num_turns"].mean()
-
-# %% Mutants with max turns
-
-data[data["num_turns"] == 16][
-    ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
-]
 
 
 # %% Number of experiments / tests per task
 
 x = np.arange(len(data))
 fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
-ax.violinplot(
-    [data["num_experiments"], data["num_tests"]], positions=[1, 2], showmeans=True
-)
+ax.violinplot([data["num_experiments"], data["num_tests"]], positions=[1, 2], showmeans=True)
 ax.set_xticks([1, 2])
 ax.set_xticklabels(["# Experiments", "# Tests"])
 ax.legend(["Number of Experiments / Tests"], loc="upper left")
@@ -397,15 +356,11 @@ plt.show()
 
 # %% Success rate
 
-data.groupby("implementation")[["mutant_killed"]].sum() / data.groupby(
-    "implementation"
-)[["mutant_killed"]].count()
+data.groupby("implementation")[["mutant_killed"]].sum() / data.groupby("implementation")[["mutant_killed"]].count()
 
 # %% Unkilled mutants
 
-data[data["mutant_killed"] == 0][
-    ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
-]
+data[data["mutant_killed"] == 0][["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]]
 
 # %% Mean test LOC
 
@@ -419,25 +374,20 @@ data[data["tag.incomplete_response"] > 0][
 
 # %% Aborted conversations
 
-data[data["tag.aborted"] > 0][
-    ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
-]
+data[data["tag.aborted"] > 0][["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]]
 
 # %% Equivalence claims
 
-data[data["tag.claimed_equivalent"] > 0][
-    ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
-]
+data[data["equivalent"]][["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]]
 
 
 # %% Number of experiments / tests before equivalence is claimed
 
-data[data["tag.claimed_equivalent"] > 0][["num_tests", "num_experiments"]].mean()
-
+data[data["equivalent"]][["num_tests", "num_experiments"]].mean()
 
 # %% Sample of equivalences
 
-data[data["tag.claimed_equivalent"] > 0].sample(n=20, random_state=1)[
+data[data["equivalent"]].sample(n=10, random_state=1)[
     [
         "implementation",
         "problem.target_path",
@@ -492,38 +442,78 @@ def get_outcome(row):
 
 
 data["outcome"] = data.apply(get_outcome, axis=1).to_frame(name="outcome")
-
-# %% Number of runs peere outcome
-
-print(f"Total runs: {len(data)}")
-print(f"Successful runs: {len(data[data["outcome"] == "success"])}")
-print(f"Equivalent runs: {len(data[data["outcome"] == "equivalent"])}")
-print(f"Failed runs: {len(data[data["outcome"] == "fail"])}")
-
-print(f"Total runs that cover the mutant: {len(data[data["mutant_covered"]])}")
-print(
-    f"Successful runs that cover the mutant: {len(data[(data["outcome"] == SUCCESS) & data["mutant_covered"]])}"
-)
-print(
-    f"Equivalent runs that cover the mutant: {len(data[(data["outcome"] == EQUIVALENT) & data["mutant_covered"]])}"
-)
-print(
-    f"Failed runs that cover the mutant: {len(data[(data["outcome"] == FAIL) & data["mutant_covered"]])}"
-)
-# %% Successful runs that don't cover the mutant?
-
-data[(data["outcome"] == "success") & (~data["mutant_covered"])][
-    ["implementation", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
-]
-
 # %% Number of runs
 
 import plotly.express as px
 
-data["color"] = data["mutant_covered"].map(lambda b: "green" if b else "red")
-fig = px.parallel_categories(data, ["outcome", "mutant_covered"], color="color")
+data["color"] = data["mutant_killed"].map(lambda b: "green" if b else "red")
+fig = px.parallel_categories(data, ["mutant_covered", "exit_code_diff", "output_diff", "outcome"], color="color")
 fig.write_html("/mnt/temp/coverage.html", auto_open=True)
 
-# %% Equivalent runs
+# %% Check for differences in exit code and output in all experiments/tests
 
-data[(data["outcome"] == "equivalent")]["id"].map(lambda x: x[-20:])
+
+def has_exit_code_difference(row):
+    for exp_or_test in row["experiments"] + row["tests"]:
+        if (correct_result := get_result(exp_or_test, mutant=False)) and (
+            mutant_result := get_result(exp_or_test, mutant=True)
+        ):
+            if correct_result["exitcode"] != mutant_result["exitcode"]:
+                return True
+    return False
+
+
+def has_output_difference(row):
+    for exp_or_test in row["experiments"] + row["tests"]:
+        if (correct_result := get_result(exp_or_test, mutant=False)) and (
+            mutant_result := get_result(exp_or_test, mutant=True)
+        ):
+            correct_output = correct_result["output"].replace(correct_result["cwd"], "")
+            mutant_output = mutant_result["output"].replace(mutant_result["cwd"], "")
+            if correct_output != mutant_output:
+                return True
+    return False
+
+
+data["exit_code_diff"] = data.apply(lambda row: has_exit_code_difference(row), axis=1)
+data["output_diff"] = data.apply(lambda row: has_output_difference(row), axis=1)
+
+# %%
+
+print(len(data[data["exit_code_diff"]]))
+print(len(data[data["output_diff"]]))
+
+print(len(data[(~data["exit_code_diff"]) & (data["outcome"] == SUCCESS)]))
+print(len(data[(data["exit_code_diff"]) & (data["outcome"] == SUCCESS)]))
+print(len(data[(~data["output_diff"]) & (data["outcome"] == SUCCESS)]))
+print(len(data[(data["output_diff"]) & (data["outcome"] == SUCCESS)]))
+
+# %% Number of runs per outcome
+
+
+def print_num_runs_per_outcome(runs):
+    print(f"  Total: {len(runs)}")
+    print(f"  Successful: {len(runs[runs["outcome"] == "success"])}")
+    print(f"  Equivalent: {len(runs[runs["outcome"] == "equivalent"])}")
+    print(f"  Failed: {len(runs[runs["outcome"] == "fail"])}")
+
+
+print("All runs:")
+print_num_runs_per_outcome(data)
+
+print("\nRuns that cover the mutant:")
+print_num_runs_per_outcome(data[data["mutant_covered"]])
+
+print("\nRuns with a exitcode difference in any experiment or test:")
+print_num_runs_per_outcome(data[data["exit_code_diff"]])
+
+print("\nRuns with a output difference in any experiment or test:")
+print_num_runs_per_outcome(data[data["output_diff"]])
+
+# %% Runs that had a difference in output but didn't result in a killing test
+
+data[data["output_diff"] & ~data["mutant_killed"]]["id"]
+
+# %% Mutants that were claimed equivalent but were still killed
+
+len(data[data["mutant_killed"] & data["equivalent"]])
