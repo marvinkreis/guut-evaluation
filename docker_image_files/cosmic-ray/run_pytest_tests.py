@@ -72,22 +72,33 @@ def run_tests(tests: List[Path]):
     parent_conn, child_conn = Pipe()
     process = Process(target=run_tests_inner, args=(tests, child_conn))
     process.start()
-    process.join()
+    process.join(180)
 
-    result: TestResult = parent_conn.recv()
-    print(result.stdout)
+    if process.is_alive():
+        process.terminate()
+        if process.is_alive():
+            process.kill()
+        test_result = TestResult(failed=True, stdout="", stderr="")
+        print("Timeout")
+    else:
+        if parent_conn.poll():
+            test_result: TestResult = parent_conn.recv()
+            print(test_result.stdout)
+        else:
+            test_result = TestResult(failed=True, stdout="", stderr="")
+            print("No answer from pytest")
 
     if baseline:
-        for test_path, test_name in set(re.findall(FAILING_TESTS_REGEX, result.stdout)):
+        for test_path, test_name in set(re.findall(FAILING_TESTS_REGEX, test_result.stdout)):
             short_path = Path(test_path).stem
             print(f"Test failed: {short_path}::{test_name}")
             exclude_test(test_path, test_name)
             patch_test_file(test_path, test_name)
     else:
-        for test_path, test_name in set(re.findall(FAILING_TESTS_REGEX, result.stdout)):
+        for test_path, test_name in set(re.findall(FAILING_TESTS_REGEX, test_result.stdout)):
             short_path = Path(test_path).stem
             print(f"Test failed: {short_path}::{test_name}")
-        sys.exit(1 if result.failed else 0)
+        sys.exit(1 if test_result.failed else 0)
 
 
 # Read arguments
