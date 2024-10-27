@@ -1,6 +1,8 @@
 __pycache__
 .ipynb_checkpoints
 /emse_projects/
+/guut_emse_results/
+/guut_emse_logs/
 /old_benchmark_data/
 /pynguin_emse_results/
 /pynguin_emse_tests/
