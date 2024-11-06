@@ -7,3 +7,5 @@ __pycache__
 /pynguin_emse_results/
 /pynguin_emse_tests/
 /guut_emse_logs.tar.xz
+/emse_projects_data/venvs/
+/emse_projects_data/pynguin_venvs/

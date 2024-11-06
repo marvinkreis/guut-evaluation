@@ -20,16 +20,19 @@ full_module_path="/emse_projects/code/${project_name}/${src_path}"
 if [[ ! -d "${result_dir}/cosmic-ray" ]]; then
     mkdir "${result_dir}/cosmic-ray"
 fi
+if [[ -f "${result_dir}/cosmic-ray/failing_tests.json" ]]; then
+    rm "${result_dir}/cosmic-ray/failing_tests.json"
+fi
 
 cd "${full_module_path}/.."
-source "/emse_projects/venvs/${project_name}/bin/activate"
+source "/emse_projects/pynguin_venvs/${project_name}/bin/activate"
 python /cosmic-ray/run_pytest_tests.py baseline "${result_dir}/cosmic-ray/failing_tests.json" "${result_dir}/tests/"*.py
 
 cat << EOF > /cosmic-ray/test_command.sh
 #!/usr/bin/env bash
 
 cd "${full_module_path}/.."
-source "/emse_projects/venvs/${project_name}/bin/activate"
+source "/emse_projects/pynguin_venvs/${project_name}/bin/activate"
 python /cosmic-ray/run_pytest_tests.py test "${result_dir}/cosmic-ray/failing_tests.json" "${result_dir}/tests/"*.py
 EOF
 chmod +x /cosmic-ray/test_command.sh

@@ -33,6 +33,9 @@ full_module_path="/emse_projects/code/${project_name}/${src_path}"
 if [[ ! -d "${result_dir}/cosmic-ray" ]]; then
     mkdir "${result_dir}/cosmic-ray"
 fi
+if (( $continue == 0 )) && [[ -f "${result_dir}/cosmic-ray/failing_tests.json" ]]; then
+    rm "${result_dir}/cosmic-ray/failing_tests.json"
+fi
 
 if (( $continue == 0 )); then
     cd "${full_module_path}/.."

@@ -1,14 +1,16 @@
-from dataclasses import dataclass
-import re
-import json
-import sys
-from pathlib import Path
-from typing import List
-from tempfile import TemporaryDirectory
-from shutil import copyfile
-from contextlib import redirect_stderr, redirect_stdout
-from multiprocessing import Process, Pipe
+import concurrent.futures
 import io
+import json
+import re
+import sys
+import time
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass
+from multiprocessing import Pipe, Process
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from threading import Event
+from typing import List, cast
 
 if sys.stdout.isatty():
     COLOR_BLUE = "\033[34m"
@@ -64,29 +66,43 @@ def run_tests_inner(tests: List[Path], conn):
         with redirect_stderr(err):
             import pytest
 
-            exit_code = pytest.main([str(test) for test in tests])
-            conn.send(TestResult(failed=(exit_code != 0), stdout=out.getvalue(), stderr=err.getvalue()))
+            try:
+                exit_code = pytest.main(
+                    ["--timeout=5", "--timeout-method=signal", "--capture=no"] + [str(test) for test in tests]
+                )
+                conn.send(TestResult(failed=(exit_code != 0), stdout=out.getvalue(), stderr=err.getvalue()))
+            except Exception:
+                conn.send(TestResult(failed=True, stdout=out.getvalue(), stderr=err.getvalue()))
 
 
 def run_tests(tests: List[Path]):
+    event = Event()
     parent_conn, child_conn = Pipe()
     process = Process(target=run_tests_inner, args=(tests, child_conn))
     process.start()
-    process.join(180)
+
+    executor = concurrent.futures.ThreadPoolExecutor()
+    future_wait = executor.submit(lambda: process.join(180) or "done")
+    future_recv = executor.submit(parent_conn.recv)
+
+    test_result = TestResult(failed=True, stdout="", stderr="")
+    for future in concurrent.futures.as_completed([future_wait, future_recv]):
+        result: TestResult | str = future.result()
+        if result == "done":
+            future_recv.cancel()
+        else:
+            future_wait.cancel()
+            test_result = cast(TestResult, result)
+            print(test_result.stdout)
+            print(test_result.stderr)
+        executor.shutdown(wait=False)
+        break
 
     if process.is_alive():
         process.terminate()
         if process.is_alive():
             process.kill()
-        test_result = TestResult(failed=True, stdout="", stderr="")
-        print("Timeout")
-    else:
-        if parent_conn.poll():
-            test_result: TestResult = parent_conn.recv()
-            print(test_result.stdout)
-        else:
-            test_result = TestResult(failed=True, stdout="", stderr="")
-            print("No answer from pytest")
+    executor.shutdown(wait=False)
 
     if baseline:
         for test_path, test_name in set(re.findall(FAILING_TESTS_REGEX, test_result.stdout)):
@@ -127,7 +143,9 @@ with TemporaryDirectory() as tempdir:
     temp_path = Path(tempdir)
     for test_path in tests:
         new_test_path = temp_path / Path(test_path).name
-        copyfile(test_path, new_test_path)
+        code = test_path.read_text()
+        code = code.replace(".<lambda>", "")  # Discard Cython syntax
+        new_test_path.write_text(code)
         new_test_paths.append(new_test_path)
 
     for excluded_test in excluded_tests:

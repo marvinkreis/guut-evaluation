@@ -5,6 +5,8 @@ set -u
 OPENAI_API_KEY=""
 OPENAI_ORGANIZATION=""
 
+mkdir /tmp/guut
+
 docker container run --rm -it \
     --mount=type=tmpfs,target=/tmp \
     --mount=type=bind,src=/tmp/guut,target=/tmp/guut \
