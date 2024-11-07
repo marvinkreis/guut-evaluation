@@ -278,19 +278,21 @@ data["cosmic_ray.killed_by_any"] = data.apply(
 del cosmic_ray_results
 
 
-# %% Check which mutants are claimed equivalent by multiple runs
-
+# %% Check which mutants are claimed equivalent by multiple runs and what runs they are claimed by
 
 equivalence_claims = {}
 for index, row in data.iterrows():
     mutant_id = mutant_id_from_row(row)
-    equivalence_claims[mutant_id] = equivalence_claims.get(mutant_id, 0) + int(row["claimed_equivalent"])
+    equivalence_claims[mutant_id] = equivalence_claims.get(mutant_id, []) + (
+        [row["id"]] if bool(row["claimed_equivalent"]) else []
+    )
 
 presets = list(data["preset"].unique())
-data["mutant.num_equivalence_claims"] = data.apply(
+data["mutant.equivalence_claims"] = data.apply(
     lambda row: equivalence_claims[mutant_id_from_row(row)],
     axis=1,
 )
+data["mutant.num_equivalence_claims"] = data["mutant.equivalence_claims"].map(len)
 del equivalence_claims
 
 
@@ -847,15 +849,6 @@ data[["num_invalid_experiments", "num_invalid_tests"]].sum()
 len(data[(data["num_experiment_import_errors"] + data["num_test_import_errors"]) > 0])
 
 
-# %% Number of runs
-
-# import plotly.express as px
-#
-# data["color"] = data["mutant_killed"].map(lambda b: "green" if b else "red")
-# fig = px.parallel_categories(data, ["mutant_covered", "exit_code_diff", "output_diff", "outcome"], color="color")
-# fig.write_html("/mnt/temp/coverage.html", auto_open=True)
-
-
 # %% Number of runs per outcome
 
 
@@ -974,6 +967,10 @@ ax.legend(
 )
 plt.show()
 
+del ticks
+del percentages_killed
+del percentages_unkilled
+
 
 # %% Plot percentage of failed runs
 
@@ -1011,66 +1008,193 @@ ax.legend(
 )
 plt.show()
 
+del ticks
+del percentages_killed
+del percentages_unkilled
 
-# %% Check if any mutant was claimed eqivalent by multiple runs
+
+# %% Plot percentage of direct kills
+
+ticks = []
+percentages = []  # [direct kill, kill with tests from same run, kill with any tests]
+
+for preset in data["settings.preset_name"].unique():
+    for project in data["project"].unique():
+        target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
+        ticks.append(f"{project} {preset}")
+        percentages.append(
+            [
+                len(target_data[target_data["mutant_killed"]]) / len(target_data),
+                len(target_data[target_data["cosmic_ray.killed_by_own"]]) / len(target_data),
+                len(target_data[target_data["cosmic_ray.killed_by_any"]]) / len(target_data),
+            ]
+        )
 
 
-# %% Sample equivalent and failed runs
+color1 = cmap_colors[0]
+color3 = cmap_colors[1]
+color2 = ((color1[0] + color3[0]) / 2, (color1[1] + color3[1]) / 2, (color1[2] + color3[2]) / 2)
 
-column_mapping = {
-    "preset": "preset",
-    "project": "project",
-    "problem.target_path": "target_path",
-    "problem.mutant_op": "mutant_op",
-    "problem.occurrence": "occurrence",
-    "id": "id",
-}
+fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
+x = np.arange(len(ticks))
+bar1 = ax.bar(x, [p[0] for p in percentages], color=cmap_colors[0])
+bar2 = ax.bar(
+    x,
+    [p[1] - p[0] for p in percentages],
+    color=cmap_colors[2],
+    bottom=[p[0] for p in percentages],
+)
+bar3 = ax.bar(
+    x,
+    [p[2] - p[1] for p in percentages],
+    color=cmap_colors[4],
+    bottom=[p[1] for p in percentages],
+)
+ax.set_xticks(x)
+ax.set_xticklabels(ticks, rotation=90)
+ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
+ax.legend(
+    [bar3, bar2, bar1],
+    [
+        "Mutants killed by any test.",
+        "Mutants killed by tests from the same preset.",
+        "Mutants killed by sucessful runs.",
+    ],
+)
+plt.show()
 
-claims_count = {}
-failed_count = {}
+del ticks
+del percentages
+
+
+# %% Number of mutants with 0/1/2/3 claims
+
+print(f"mutants with {0} claims: {len(data[data["mutant.num_equivalence_claims"] == 0])//4:4d}")
+print(f"mutants with {1} claims: {len(data[data["mutant.num_equivalence_claims"] == 1])//4:4d}")
+print(f"mutants with {2} claims: {len(data[data["mutant.num_equivalence_claims"] == 2])//4:4d}")
+print(f"mutants with {3} claims: {len(data[data["mutant.num_equivalence_claims"] == 3])//4:4d}")
+print(f"mutants with {4} claims: {len(data[data["mutant.num_equivalence_claims"] == 4])//4:4d}")
+print(f"total number of claims: {len(data[data["claimed_equivalent"]])}")
+
+
+# %% Number of unkilled mutants with 1/2/3 claims per preset and project
+
 for preset in data["preset"].unique():
+    if preset == "baseline_without_iterations":
+        continue
     for project in data["project"].unique():
         target_data = data[(data["project"] == project) & (data["preset"] == preset)]
         claims_unkilled = cast(
             pd.DataFrame, target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray.killed_by_any"]]
         )
-        failed_runs_unkilled = cast(
-            pd.DataFrame, target_data[(target_data["outcome"] == FAIL) & ~target_data["cosmic_ray.killed_by_any"]]
+        killed_by_1 = len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 1])
+        killed_by_2 = len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 2])
+        killed_by_3 = len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 3])
+        print(f"{preset:<25} {project:<20} {killed_by_1:3} {killed_by_2:3} {killed_by_3:3}")
+
+# %% Number of unkilled mutants with 1/2/3 claims per project
+
+for project in data["project"].unique():
+    target_data = data[(data["project"] == project)]
+    claims_unkilled = cast(
+        pd.DataFrame, target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray.killed_by_any"]]
+    )
+    print(
+        f"{project:<20} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 1]):3} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 2])//4:3} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 3])//4:3}"
+    )
+
+
+# %% Sample equivalent and failed runs
+
+# include all of baseline (only 34 unkilled claimed mutants)
+sampled_mutants = data[
+    ((data["preset"] == "baseline_with_iterations") | (data["preset"] == "baseline_without_iterations"))
+    & (data["outcome"] == EQUIVALENT)
+    & (~data["cosmic_ray.killed_by_any"])
+]
+
+for project in data["project"].unique():
+    # The "cosmic_ray.killed_by_any" and "mutant.num_equivalence_claims" columns are replicated for each preset.
+    # Therefore, we only look at the "debugging_one_shot" data here.
+    target_data = data[(data["project"] == project) & (data["preset"] == "debugging_one_shot")]
+
+    # include 5 mutants for each number of claims
+    for num_claims in [3, 2, 1, 0]:
+        new_mutants = cast(
+            pd.DataFrame,
+            target_data[
+                (target_data["mutant.num_equivalence_claims"] == num_claims)
+                & (~target_data["cosmic_ray.killed_by_any"])
+                & (
+                    ~cast(pd.Series, target_data["mutant_id"]).isin(
+                        cast(pd.Series, sampled_mutants["mutant_id"]).unique()
+                    )
+                )
+            ],
         )
+        new_sample = new_mutants.sample(n=min(len(new_mutants), 5), random_state=1)
+        # print(f"sampled {len(new_sample)} with {num_claims} claims from {project}")
+        sampled_mutants = pd.concat([sampled_mutants, new_sample])
 
-        claims_unkilled.rename(columns=column_mapping).assign(equivalent=None, comment=None).sample(
-            frac=1, random_state=1
-        ).to_csv(
-            OUTPUT_PATH / f"equivalence_claims_of_unkilled_mutants_{preset}_{project}.csv",
-            columns=[*column_mapping.values(), "equivalent", "comment"],
-        )
-        failed_runs_unkilled.rename(columns=column_mapping).assign(equivalent=None, comment=None).sample(
-            frac=1, random_state=1
-        ).to_csv(
-            OUTPUT_PATH / f"failed_runs_with_unkilled_mutants_{preset}_{project}.csv",
-            columns=[*column_mapping.values(), "equivalent", "comment"],
-        )
+# Double-check that we don't have any duplicate mutants
+assert len(sampled_mutants) == len(set(sampled_mutants["mutant_id"]))
 
-        for mutant_id in claims_unkilled["mutant_id"][:20]:
-            count = claims_count.get(mutant_id, 0)
-            claims_count[mutant_id] = count + 1
-        for mutant_id in failed_runs_unkilled["mutant_id"][:20]:
-            count = failed_count.get(mutant_id, 0)
-            failed_count[mutant_id] = count + 1
+print(f"{len(sampled_mutants):4d} mutants in total")
+print()
+
+for num_claims in [0, 1, 2, 3]:
+    print(
+        f"{len(sampled_mutants[sampled_mutants["mutant.num_equivalence_claims"] == num_claims]):4d} mutants with {num_claims} claims"
+    )
+print()
+
+for project in data["project"].unique():
+    print(f"{len(sampled_mutants[sampled_mutants["project"] == project]):4d} mutants from {project}")
+print()
+
+sampled_mutants_per_preset = {}
+for index, row in sampled_mutants.iterrows():
+    for preset in row["mutant.equivalence_claims"]:
+        sampled_mutants_per_preset[preset] = sampled_mutants_per_preset.get(preset, []) + [preset]
+for preset in data["preset"].unique():
+    print(f"{len(sampled_mutants_per_preset.get(preset, [])):4d} mutants from {preset}")
+print()
+del sampled_mutants_per_preset
+
+# Write to CSV
+
+column_mapping = {
+    "project": "project",
+    "problem.target_path": "target_path",
+    "problem.mutant_op": "mutant_op",
+    "problem.occurrence": "occurrence",
+    "mutant.equivalence_claims": "claimed_by",
+}
+
+sampled_mutants["mutant.equivalence_claims"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
+    ", ".join
+)
+
+sampled_mutants = cast(pd.DataFrame, sampled_mutants).sort_values(
+    by=["project", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
+)
+
+sampled_mutants.rename(columns=column_mapping).assign(
+    equivalent_private=None, equivalent_public=None, comment=None
+).to_csv(
+    OUTPUT_PATH / "sampled_mutants.csv",
+    columns=[*column_mapping.values(), "equivalent_private", "equivalent_public", "comment"],
+)
 
 
-# %%
+# %% Check which percentage of mutants with n claims were (not) killed
 
-print(len(data[(data["preset"] == "debugging_one_shot") & (data["mutant.num_equivalence_claims"] == 0)]))
-print(len(data[(data["preset"] == "debugging_one_shot") & (data["mutant.num_equivalence_claims"] == 1)]))
-print(len(data[(data["preset"] == "debugging_one_shot") & (data["mutant.num_equivalence_claims"] == 2)]))
-print(len(data[(data["preset"] == "debugging_one_shot") & (data["mutant.num_equivalence_claims"] == 3)]))
-print(len(data[(data["preset"] == "debugging_one_shot") & (data["mutant.num_equivalence_claims"] == 4)]))
-print(len(data[data["claimed_equivalent"]]))
+mutant_data = data[data["preset"] == "debugging_one_shot"]
 
-# %%
+for num_claims in [0, 1, 2, 3]:
+    percentage = len(
+        data[(data["mutant.num_equivalence_claims"] == num_claims) & (~data["cosmic_ray.killed_by_any"])]
+    ) / len(data[data["mutant.num_equivalence_claims"] == num_claims])
+    print(f"{percentage * 100:5.2f}% of mutants with {num_claims} claims weren't killed by any test")
 
-print(len(data[(data["preset"] == "debugging_one_shot")]))
-print(len(data[(data["preset"] == "debugging_zero_shot")]))
-print(len(data[(data["preset"] == "baseline_with_iterations")]))
-print(len(data[(data["preset"] == "baseline_without_iterations")]))
+del mutant_data
