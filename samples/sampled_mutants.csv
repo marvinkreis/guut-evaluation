@@ -1,0 +1,166 @@
+,project,target_path,mutant_op,occurrence,claim1,claim2,claim3,equivalent,fully_equivalent,unsure,test_available,comment
+1147,apimd,__main__.py,core/ReplaceComparisonOperator_Eq_Is,0,,,,0,0,1,1,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
+905,apimd,__main__.py,core/ReplaceComparisonOperator_Eq_LtE,2,e49eee1c,e0e874a9,,0,0,0,1,"Mutant changes ""__name__  == '__main__'"" to ""__name__ <= '__main__'""."
+1328,apimd,compiler.py,core/AddNot,2,,,,1,0,0,1,"Detecting the mutant requires creating an object that pretends it doesn't have the ""__class__"" attribute."
+1539,apimd,compiler.py,core/AddNot,49,7e62fc6a,,,0,0,0,1,
+1057,apimd,compiler.py,core/NumberReplacer,42,,,,0,0,0,1,
+757,apimd,compiler.py,core/NumberReplacer,45,,,,0,0,1,1,Mutant adds an iteration to the failure case of a loop that retries imports to find the right order. The mutant can be detected by counting log messages.
+1040,apimd,compiler.py,core/ReplaceComparisonOperator_Eq_Is,0,e799afb2,48282757,,0,0,1,1,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
+746,apimd,compiler.py,core/ReplaceComparisonOperator_Eq_Is,2,0323ddd7,d0b5d85b,,0,0,1,1,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
+1116,apimd,compiler.py,core/ReplaceComparisonOperator_Eq_Is,5,88f00e78,834cb9df,,1,0,0,0,"Replaces ""=="" with ""is"" in an int comparison. Both of the operands are derived from the input string by the target function."
+1618,apimd,compiler.py,core/ReplaceComparisonOperator_Eq_Lt,0,a5eca73e,,,1,0,0,1,"Detecting the mutant requires creating an object that pretends it doesn't have the ""__class__"" attribute."
+981,apimd,compiler.py,core/ReplaceComparisonOperator_Eq_NotEq,0,,,,1,0,0,1,"Detecting the mutant requires creating an object that pretends it doesn't have the ""__class__"" attribute."
+1340,apimd,compiler.py,core/ReplaceComparisonOperator_Is_Eq,1,0a07d6c9,5da8c77a,,1,0,0,1,"Mutant replaces ""type(parent.__dict__[name]) is staticmethod"" with ""type(parent.__dict__[name]) == staticmethod"". Killing the mutant requires defining a metaclass with illegal __eq__ logic."
+1367,apimd,compiler.py,core/ReplaceComparisonOperator_Lt_IsNot,0,24b9d85a,,,1,1,0,1,"Mutant replaces ""while counter < len(module_names)"" with ""while counter is not len(module_names)"". It's possible to create a class that returns -1 for its ""__len__()"", but this causes a ""ValueError"" in ""len""."
+1633,apimd,compiler.py,core/ReplaceComparisonOperator_NotEq_IsNot,0,eea33ca6,,,1,,0,0,"Mutant replaces ""name != get_name(obj)"" with ""name is not get_name(obj)"", where name comes from ""m.__dict__.items()"". Might be possible to kill, but I didn't manage."
+986,apimd,compiler.py,core/ReplaceUnaryOperator_USub_Not,1,d88a2265,,,0,0,0,1,
+27208,codetiming,_timer.py,core/NumberReplacer,0,e7a4cfef,,,0,0,0,1,
+17855,codetiming,_timer.py,core/NumberReplacer,1,9773ffe6,,,0,0,0,1,
+27234,codetiming,_timer.py,core/ReplaceBinaryOperator_Mul_Add,0,,,,0,0,0,1,
+28783,codetiming,_timer.py,core/ReplaceBinaryOperator_Mul_Sub,0,eb3270b1,a3b69aa7,,0,0,0,1,
+17859,codetiming,_timer.py,core/ReplaceBinaryOperator_Sub_Mod,0,66d27b4f,,,0,0,0,1,
+28796,codetiming,_timer.py,core/ReplaceFalseWithTrue,0,b2b6bfa4,57fd01bd,,0,0,0,1,
+27224,codetiming,_timer.py,core/ReplaceFalseWithTrue,2,bc0f76a1,,,0,0,0,1,
+27201,codetiming,_timers.py,core/NumberReplacer,4,,,,0,0,1,1,Mutant is only killable by setting private variables.
+27217,codetiming,_timers.py,core/NumberReplacer,5,,,,0,0,1,1,Mutant is only killable by setting private variables.
+28777,codetiming,_timers.py,core/NumberReplacer,8,7c55e9b1,,,0,0,1,1,Mutant is only killable by setting private variables.
+28778,codetiming,_timers.py,core/NumberReplacer,9,9f8d7004,,,0,0,1,1,Mutant is only killable by setting private variables.
+18715,dataclasses-json,api.py,core/ReplaceTrueWithFalse,1,b3ebc64a,52543b1f,,0,0,0,1,"Mutant changes the default setting for ""check_circular"" in ""json.dumps""."
+18645,dataclasses-json,core.py,core/ReplaceAndWithOr,6,3a62475f,086e3136,,0,0,0,1,
+18646,dataclasses-json,core.py,core/ReplaceComparisonOperator_NotEq_IsNot,0,,,,1,,0,0,"Mutant replaces ""field_type != str"" with ""field_type is str""."
+18273,dataclasses-json,core.py,core/ReplaceTrueWithFalse,0,,,,0,0,0,1,
+18722,dataclasses-json,mm.py,core/AddNot,26,00f70738,,,0,0,0,1,
+18193,dataclasses-json,mm.py,core/ReplaceComparisonOperator_IsNot_NotEq,3,4fedb96e,,,1,0,1,1,"Mutant changes ""is not"" to ""!="" in a comparison with a sentinel value."
+18502,dataclasses-json,undefined.py,core/RemoveDecorator,1,,,,0,0,0,1,
+18619,dataclasses-json,undefined.py,core/RemoveDecorator,2,fb006602,d8e66bda,,0,0,0,1,Mutant makes a static method non-static.
+18954,dataclasses-json,undefined.py,core/RemoveDecorator,4,,,,0,0,0,1,Mutant makes a static method non-static.
+19888,dataclasses-json,undefined.py,core/RemoveDecorator,12,7b169b6e,,,0,0,0,1,Mutant makes a static method non-static.
+18186,dataclasses-json,undefined.py,core/ReplaceBinaryOperator_Sub_Add,3,65363261,6ab8a1b2,,0,0,0,1,Mutant changes some argument parsing logic.
+19958,dataclasses-json,undefined.py,core/ReplaceBinaryOperator_Sub_BitAnd,2,557519d0,7c5e7e60,,0,0,0,1,Mutant changes some argument parsing logic.
+18567,dataclasses-json,undefined.py,core/ReplaceBinaryOperator_Sub_Mul,3,,,,0,0,0,1,Mutant changes some argument parsing logic.
+18707,dataclasses-json,undefined.py,core/ReplaceComparisonOperator_Eq_GtE,1,fd518ac0,,,0,0,0,1,
+18814,dataclasses-json,undefined.py,core/ReplaceComparisonOperator_Eq_Is,0,70ed84b8,,,0,0,0,1,
+18821,dataclasses-json,undefined.py,core/ReplaceComparisonOperator_Eq_LtE,1,b445a4cc,d7645290,,1,1,0,0,"Mutant replaces ""len(unknown) == 0"" with ""len(unknown) <= 0""."
+18239,dataclasses-json,utils.py,core/NumberReplacer,3,33a57265,,,0,0,0,1,Mutant replaces a number in a python version comparison.
+20506,docstring_parser,google.py,core/NumberReplacer,1,f83916a5,f4b33e0b,,0,0,0,1,
+20880,docstring_parser,google.py,core/NumberReplacer,4,e5dab18a,,,0,0,0,1,
+21309,docstring_parser,google.py,core/ReplaceComparisonOperator_Eq_GtE,0,,,,0,0,0,1,
+20549,docstring_parser,google.py,core/ReplaceComparisonOperator_Eq_Is,0,48bb8129,1f245edf,,0,0,0,1,
+21349,docstring_parser,google.py,core/ReplaceComparisonOperator_Eq_Is,1,e271fd72,,,0,0,0,1,
+20457,docstring_parser,google.py,core/ReplaceComparisonOperator_Eq_Is,2,,,,0,0,0,1,
+20861,docstring_parser,google.py,core/ReplaceContinueWithBreak,0,,,,0,0,0,1,Mutant causes all sections after a mismatched section to be ignored.
+21356,docstring_parser,numpydoc.py,core/NumberReplacer,3,ccde1275,,,1,0,0,1,Mutant is only killable by creating a custom string object that always reports length 0.
+20432,docstring_parser,numpydoc.py,core/ReplaceComparisonOperator_Gt_GtE,1,,,,1,0,0,1,Mutant is only killable by creating a custom string object that always reports length 0. Effectively the same mutant as 21356.
+20254,docstring_parser,numpydoc.py,core/ReplaceComparisonOperator_Gt_NotEq,1,ba1af9ff,51f07904,,1,1,0,0,"Mutant changes ""len(value) > 0"" to ""len(value) != 0""."
+21179,docstring_parser,numpydoc.py,core/ReplaceComparisonOperator_Gt_NotEq,2,d20fa12c,,,1,1,0,0,"Mutant changes ""len(key) > 0"" to ""len(key) != 0""."
+20520,docstring_parser,parser.py,core/ReplaceComparisonOperator_NotEq_IsNot,0,,,,0,0,1,1,"Mutant changes ""!="" to ""is not"" for an enum comparison."
+20575,docstring_parser,rest.py,core/ReplaceBinaryOperator_BitOr_Add,1,c06684c6,5e10234f,,1,1,0,0,"Mutant changes ""re.S | re.M"" to ""re.S + re.M"" which is equivalent. But this might depend on the python implementation?"
+8373,docstring_parser,rest.py,core/ReplaceBinaryOperator_BitOr_BitXor,0,a8e375a6,,,0,0,0,1,Killing the mutant requires messing with the data of the module.
+20203,docstring_parser,rest.py,core/ReplaceComparisonOperator_Eq_LtE,5,efaeba4b,,,1,,1,0,"Mutant changes ""len(args) == 1"" to len(args) <= 1"". The function accesses ""args[0]"" earlier, so this Mutant isn't killable without messing with list behavior."
+20801,docstring_parser,rest.py,core/ReplaceContinueWithBreak,0,7b906574,c8effa78,,1,,1,0,Mutant is behind an if condition that should never be true.
+21955,flake8,checker.py,core/NumberReplacer,1,3276556,f20f8915,,0,0,0,1,Mutant replaces a number in a python version comparison.
+14449,flake8,checker.py,core/ReplaceComparisonOperator_Eq_Is,2,61d418dd,,,0,0,1,1,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
+24727,flake8,checker.py,core/ReplaceComparisonOperator_Eq_LtE,3,,,,0,0,0,1,
+22057,flake8,checker.py,core/ReplaceFalseWithTrue,1,,,,0,0,1,0,
+22250,flake8,main/git.py,core/ReplaceComparisonOperator_Eq_LtE,0,,,,1,,0,0,"Mutant replaces ""returncode == 0"" with ""returncode <= 0""."
+23198,flake8,plugins/pyflakes.py,core/AddNot,1,ab780bc4,,,0,0,0,1,
+21882,flake8,plugins/pyflakes.py,core/ReplaceComparisonOperator_Eq_Is,1,,,,0,0,1,1,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
+21938,flake8,plugins/pyflakes.py,core/ReplaceTrueWithFalse,0,808960c1,,,0,0,0,1,
+15998,flake8,plugins/pyflakes.py,core/ReplaceTrueWithFalse,10,af039519,9894832d,6329dee7,0,0,0,1,
+14964,flake8,processor.py,core/ReplaceBreakWithContinue,1,cbae0699,42abcbc0,7a31d2ff,0,0,0,1,
+23156,flake8,processor.py,core/ReplaceComparisonOperator_Lt_IsNot,2,ed08985d,,,0,0,1,1,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
+22009,flake8,processor.py,core/ReplaceFalseWithTrue,2,,,,0,0,0,1,
+15819,flake8,style_guide.py,core/NumberReplacer,0,d2279d98,2f407dd9,752b909a,0,0,0,1,
+24762,flake8,style_guide.py,core/ReplaceAndWithOr,9,1324d358,9d3e8e14,,1,,1,1,Mutant modifies a condition in an if-else cascade. But the condition is not satisfiable with or without mutant.
+14679,flake8,style_guide.py,core/ReplaceComparisonOperator_Eq_LtE,1,58e4273d,3848b10d,1030af4c,0,0,0,1,
+14440,flake8,style_guide.py,core/ReplaceComparisonOperator_Is_Eq,7,a359012a,,,1,,0,1,"Mutant changes ""=="" to ""is"" for an enum comparison."
+24726,flake8,style_guide.py,core/ReplaceComparisonOperator_Is_IsNot,13,9e4297f3,,,0,0,0,1,
+22020,flake8,utils.py,core/ReplaceBinaryOperator_Sub_FloorDiv,0,f261d685,,,0,0,0,1,
+22433,flake8,utils.py,core/ReplaceComparisonOperator_Eq_GtE,1,82b36231,e1703658,,1,,0,1,"Mutant changes string comparison from ""token.tp == _FILE"" to ""token.tp >= _FILE"", where only one possible value for ""token.tp"" is greater than ""_FILE"", but that value is caught earlier."
+14878,flake8,utils.py,core/ReplaceComparisonOperator_Eq_Is,4,806fcc2f,4ecc0ef4,,1,,0,0,"Mutant changes string comparison from ""token.tp == _FILE"" to ""token.tp is _FILE"", where ""token.tp"" is a string, but is used as an enum."
+23154,flake8,utils.py,core/ReplaceComparisonOperator_Eq_Is,8,309679b2,2c0170e6,,1,,0,0,
+23174,flake8,utils.py,core/ReplaceComparisonOperator_NotEq_LtE,0,5b111631,2f1a7d98,,0,0,0,1,
+14536,flake8,utils.py,core/ReplaceOrWithAnd,2,301fba0a,2617369d,e0acea63,0,0,0,1,Killing mutant requires mocking the python version.
+29434,flutes,fs.py,core/ReplaceComparisonOperator_Eq_Is,0,d776b1f7,36962cc3,,1,,0,0,"Mutant changes 'if platform.system() == ""Darwin""' to 'if platform.system() is ""Darwin""'."
+10222,flutes,io.py,core/ReplaceComparisonOperator_NotEq_IsNot,0,,,,0,0,1,1,
+9037,flutes,multiproc.py,core/NumberReplacer,62,5a6a0dd3,4addc0e3,,0,0,0,1,
+9291,flutes,multiproc.py,core/NumberReplacer,70,9681a414,4b70d082,,0,0,0,1,
+27130,flutes,multiproc.py,core/NumberReplacer,78,d96e40a9,adf19cbc,adef5986,0,0,0,1,
+9462,flutes,multiproc.py,core/NumberReplacer,94,e2cbaa64,,,0,0,0,1,
+28719,flutes,multiproc.py,core/RemoveDecorator,0,dcd27443,2d082732,d7c77d85,0,0,0,1,Mutant makes a static method non-static.
+9498,flutes,multiproc.py,core/RemoveDecorator,10,3e577f13,3d5c99c5,,1,1,0,1,"Mutant removes an ""@overload"" decorator, which is a no-op in Python 3.8."
+27388,flutes,multiproc.py,core/ReplaceBinaryOperator_Add_Mod,1,bdfb3800,,,0,0,0,1,
+28368,flutes,multiproc.py,core/ReplaceBinaryOperator_Add_Mod,8,6faeaaf7,,,0,0,0,1,
+9229,flutes,multiproc.py,core/ReplaceBinaryOperator_Add_Pow,7,edf64a73,,,0,0,0,1,
+8964,flutes,multiproc.py,core/ReplaceBinaryOperator_Add_Sub,4,,,,0,0,0,1,
+9030,flutes,multiproc.py,core/ReplaceBinaryOperator_Mul_BitXor,1,,,,0,,1,0,TODO
+8840,flutes,multiproc.py,core/ReplaceBinaryOperator_Mul_Div,16,b761a761,8bb8c32f,,0,0,0,1,
+8955,flutes,multiproc.py,core/ReplaceBinaryOperator_Mul_Sub,15,96687b73,,,0,0,0,1,
+9430,flutes,multiproc.py,core/ReplaceBinaryOperator_Sub_Pow,3,bc1f3f2c,,,0,0,0,1,
+9256,flutes,multiproc.py,core/ReplaceComparisonOperator_Eq_Is,5,99db1000,,,1,,0,0,"Mutant changes an int comparison from ""=="" to ""is"" one operand number comes from a ""max"" function call, the other from ""enumerate""."
+9119,flutes,multiproc.py,core/ReplaceComparisonOperator_Gt_LtE,5,,,,0,0,0,1,
+9211,flutes,multiproc.py,core/ReplaceComparisonOperator_Lt_Gt,1,,,,0,0,0,1,
+28807,flutes,multiproc.py,core/ReplaceComparisonOperator_NotEq_IsNot,0,2ec211e4,afada351,0a4c7409,1,0,0,1,"Mutant changes ""self._pool._state != mp.pool.RUN"" to ""self._pool._state is not mp.pool.RUN""."
+10101,flutes,multiproc.py,core/ReplaceTrueWithFalse,12,84783f0f,4f5a14cf,,0,0,0,1,
+29426,flutes,multiproc.py,core/ReplaceUnaryOperator_Delete_USub,2,5484828a,8239516b,1e6a65f8,0,0,0,1,
+4079,flutils,moduleutils.py,core/ReplaceComparisonOperator_Is_Eq,2,381debd2,,,1,0,0,1,"Mutant changes a bool comparison from ""is_valid is True"" to ""is_valid == True""."
+3439,flutils,txtutils.py,core/ReplaceComparisonOperator_GtE_Gt,0,91cfaf7a,4e7d4bda,,0,0,0,1,
+26601,httpie,cli/argparser.py,core/AddNot,50,,,,0,0,0,1,
+26807,httpie,cli/argparser.py,core/ReplaceComparisonOperator_NotEq_Gt,0,8257944c,,,1,0,0,1,"Mutant changes ""if file_fields != ['']"" to ""if file_fields > ['']"", where ""file_fields"" cannot be ""[]""."
+25753,httpie,cli/definition.py,core/AddNot,0,43735278,d0b36097,,0,0,0,1,
+25802,httpie,cli/definition.py,core/NumberReplacer,3,4321d6f3,b11dded9,,0,0,0,1,
+17042,httpie,cli/definition.py,core/ReplaceBinaryOperator_Add_BitOr,1,c067732f,ca0555a3,,0,0,0,1,
+26041,httpie,config.py,core/ReplaceComparisonOperator_NotEq_IsNot,0,ee8a4544,78c1fca9,,1,0,0,1,"Mutant changes an errno comparison from ""!="" into ""is not""."
+16498,httpie,config.py,core/ReplaceComparisonOperator_NotEq_IsNot,1,879b6fe4,,,1,0,0,1,"Mutant changes an errno comparison from ""!="" into ""is not""."
+26217,httpie,config.py,core/ReplaceComparisonOperator_NotEq_IsNot,2,d226a5ad,b1e993f1,,1,0,0,1,"Mutant changes an errno comparison from ""!="" into ""is not""."
+25827,httpie,core.py,core/ReplaceComparisonOperator_Eq_Is,1,,,,1,1,1,0,"Mutant changes a comparison between enum values from ""=="" into ""is"". Both sides of the comparison are controlled by the target function."
+16657,httpie,core.py,core/ReplaceComparisonOperator_Is_Eq,0,278b3f49,f17b9a99,b7c78ba7,1,0,0,1,"Mutant changes ""type(arg) is bytes"" into ""type(arg) == bytes"". Killing the mutant requires defining a metaclass with illegal __eq__ logic."
+26592,httpie,core.py,core/ReplaceComparisonOperator_NotEq_Is,1,5e78b085,,,0,0,0,1,"Mutant changes ""e.code != ExitStatus.SUCCESS"" to ""e.code is ExitStatus.SUCCESS""."
+25884,httpie,core.py,core/ReplaceComparisonOperator_NotEq_LtE,2,,,,0,0,0,1,"Mutant changes ""exit_status != ExitStatus.SUCCESS"" to ""exit_status <= ExitStatus.SUCCESS""."
+16453,httpie,core.py,core/ReplaceFalseWithTrue,4,f4db4b33,,,0,0,0,1,Mutant changes the default value for a boolean parameter.
+26032,httpie,downloads.py,core/ExceptionReplacer,3,,,,0,0,0,1,"Mutant causes a ""NameError"" as it replaces an exception type with an unknown exception type."
+26689,httpie,downloads.py,core/NumberReplacer,20,,,,0,0,0,1,
+26765,httpie,downloads.py,core/NumberReplacer,25,39f2749f,,,0,0,0,1,
+26085,httpie,downloads.py,core/NumberReplacer,46,5b486a59,,,1,0,0,1,Killing the mutant requires creating an invalid int that is not truthy but raises a DivideByZeroError when divided by.
+26630,httpie,models.py,core/RemoveDecorator,2,40be50f3,b3d18da2,,0,0,0,1,
+16957,httpie,output/formatters/colors.py,core/ExceptionReplacer,3,ae95245c,4a2e4b62,b8d0cc44,0,0,0,1,
+16785,httpie,output/formatters/colors.py,core/ReplaceComparisonOperator_Eq_LtE,0,dbea02ed,,,0,0,0,1,
+26203,httpie,output/formatters/colors.py,core/ReplaceComparisonOperator_Eq_LtE,1,1dc8fad7,,,0,0,0,1,Mutant only changes the behavior when the terminal running the program has less than 256 colors.
+16727,httpie,output/streams.py,core/NumberReplacer,5,26f67c31,f3cba9fe,e98773a6,0,0,0,1,
+16988,httpie,utils.py,core/ReplaceBinaryOperator_Mod_LShift,1,47081192,f23647ba,,0,0,0,1,
+15731,pdir2,api.py,core/NumberReplacer,8,,,,1,0,0,0,"Mutant changes ""doc.split('\n', 1)[0]"" to ""doc.split('\n', 2)[0]"""
+15773,pdir2,api.py,core/NumberReplacer,9,ed2c7af4,,,0,0,0,1,
+15540,pdir2,api.py,core/NumberReplacer,11,,,,0,0,0,1,
+15536,pdir2,api.py,core/ReplaceComparisonOperator_Eq_GtE,0,77e20bfe,,,0,0,1,1,"Killing the mutant requires the os name returned by ""platform.system()"" to be greater than ""Windows""."
+16103,pdir2,api.py,core/ReplaceComparisonOperator_Eq_Is,1,2829390a,,,1,0,0,0,"Mutant changes ""=="" to ""is"" for an enum comparison."
+2102,pdir2,api.py,core/ReplaceFalseWithTrue,1,374a4659,226f3d83,7822ec64,1,0,0,1,"Killing the mutant requires creating an object with an invalid ""__doc__"" attribute."
+15693,pdir2,attr_category.py,core/ReplaceComparisonOperator_Eq_Is,0,,,,1,0,0,0,"Mutant changes ""=="" to ""is"" for an enum comparison."
+15604,pdir2,color.py,core/ReplaceBinaryOperator_Add_BitAnd,0,713d922d,23d60546,,0,0,0,1,
+15692,pdir2,color.py,core/ReplaceBinaryOperator_Add_BitOr,0,364f8249,2527c9d0,,0,0,0,1,Basically the same Mutant as 15604.
+15694,pdir2,color.py,core/ReplaceBinaryOperator_Add_Mod,0,8b2cc677,e0b1b8a4,,0,0,0,1,Basically the same Mutant as 15604.
+15569,pdir2,color.py,core/ReplaceBinaryOperator_Add_Mul,0,10bb21d6,,,0,0,0,1,Basically the same Mutant as 15604.
+15500,pdir2,color.py,core/ReplaceBinaryOperator_Mod_BitOr,1,9d64e883,ee20f0c0,,0,0,0,1,Basically the same Mutant as 15604.
+15762,pdir2,color.py,core/ReplaceBinaryOperator_Mod_RShift,1,,,,0,0,0,1,Basically the same Mutant as 15604.
+15595,pdir2,color.py,core/ReplaceComparisonOperator_Eq_Gt,0,1db21cff,,,0,0,0,1,
+16123,pdir2,color.py,core/ReplaceComparisonOperator_Eq_Is,0,081bf2a2,ca8f7e58,,0,0,1,1,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
+15492,pdir2,format.py,core/NumberReplacer,4,,,,0,0,1,1,
+10670,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_Add,9,525a5480,,,1,0,0,1,"Mutant changes ""+"" to ""|"" for regex flags."
+9749,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_Add,13,b0f2495f,0490c403,,1,0,0,1,"Mutant changes ""+"" to ""|"" for regex flags."
+9725,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_BitAnd,11,36d3465d,,,1,0,0,0,"Mutant changes ""re.MULTILINE | re.DOTALL"" to ""re.MULTILINE & re.DOTALL"" (effectively disabling the flags), but the regex doesn't use ""."", ""^"" or ""$""."
+5985,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_BitXor,13,4a6e4198,c8d3f1cc,bd1e18e9,1,0,0,0,"Mutant changes ""re.IGNORECASE | re.UNICODE"" to ""re.IGNORECASE ^ re.UNICODE""."
+5923,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_LShift,7,b53ce843,952d3dbb,5a44d1d6,1,0,1,0,"Mutant changes ""re.MULTILINE | re.DOTALL"" to ""re.MULTILINE << re.DOTALL"" (effectively disabling the flags). The regex does use the ""."", but the flag change doesn't seem to affect the matches."
+11200,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_Mod,3,,,,1,0,0,0,"Mutant effectively disables the ""re.MULTILINE"" flag for a regex, but the regex doesn't use ""^"" or ""$""."
+10528,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_Mod,5,,,,1,0,0,0,"Mutant effectively disables the ""re.MULTILINE"" flag for a regex, but the regex doesn't use ""^"" or ""$""."
+10010,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_Mul,6,0ea3eb5e,,,0,0,0,1,"Mutant produces the ""re.DEBUG"" flag by multiplying flags. This causes text to be dumped to stdout."
+10564,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_Mul,7,f0e53f38,d0afc1c6,,0,0,0,1,"Mutant produces the ""re.DEBUG"" flag by multiplying flags. This causes text to be dumped to stdout."
+9777,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_Mul,10,,,,0,0,0,1,"Mutant produces the ""re.DEBUG"" flag by multiplying flags. This causes text to be dumped to stdout."
+11243,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_RShift,2,1049aec9,4c537fbf,,1,0,0,0,"Mutant effectively removes the ""re.UNICODE"" flag for a regex, but this flag is on by default in python."
+5908,python-string-utils,generation.py,core/NumberReplacer,13,5249ec51,108fdad3,fab4cb98,1,0,0,1,"Killing the mutant requires creating an illegal int object and modifying the ""isinstance"" function."
+6719,python-string-utils,generation.py,core/ReplaceComparisonOperator_Gt_Eq,2,cc5b9fa1,f39c6f7d,,1,0,0,0,"Mutant changes ""step > 0 and (start > stop or start + step > stop)"" to ""step == 0 and (start > stop or start + step > stop)"", where start, stop and step have to be ints."
+10789,python-string-utils,generation.py,core/ReplaceComparisonOperator_Gt_GtE,1,,,,1,0,0,0,"Mutant changes ""step > 0 and (start > stop or start + step > stop)"" to ""step >= 0 and (start > stop or start + step > stop)"", where start, stop and step have to be ints."
+10057,python-string-utils,manipulation.py,core/NumberReplacer,15,e7ff1af8,2e25decd,,0,0,0,1,
+10056,python-string-utils,manipulation.py,core/NumberReplacer,55,927d9eb6,,,0,0,0,1,
+9908,python-string-utils,manipulation.py,core/NumberReplacer,73,8df9e160,08e237cb,,0,0,0,1,
+6863,python-string-utils,manipulation.py,core/RemoveDecorator,4,cfddc306,9d8f4564,94d84f54,0,0,0,1,
+9849,python-string-utils,validation.py,core/ReplaceComparisonOperator_Gt_GtE,2,,,,0,0,0,1,
+10674,python-string-utils,validation.py,core/ReplaceComparisonOperator_NotEq_Lt,1,19bd3248,,,1,0,0,1,"Mutant changes ""head_char != tail_char"" to ""head_char < tail_char"" for an early-return condition. However, this expression is also checked with the operands swapped later on."
