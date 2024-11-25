@@ -1,14 +1,14 @@
 Counts as equivalent:
     - Having to break conventions of builtins or the standard library in order to kill the mutant.
         - Replacing builtin functions to change their behavior in unexpected ways.
-        - Creating an object without a "__class__" attribute.
+        - Creating unexpected objects (e.g. objects without a "__class__" attribute).
         - Replacing sys.version_info.
         - Creating subclasses of standard types (e.g. list, str) that change their behavior in unexpected ways.
-    - Having to change the environment in order to kill the mutant. (e.g. changing to a different os or Python interpreter)
+    - Having to change the environment in order to kill the mutant. (e.g. changing to a different OS or Python interpreter)
 
 Counts as killable:
     - Having to check SyntaxWarning on import.
-    - Having to replacing/mock package-internal symbols.
+    - Having to replace/mock package-internal symbols.
     - Having to pass sub-classes of standard types (e.g. a UserString subclass instead of str).
     - Having to create a class that is "==" to a builtin class.
     - Having to create an object that is "==" to some other object.

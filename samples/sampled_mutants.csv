@@ -1,4 +1,4 @@
-,project,target_path,mutant_op,occurrence,claim1,claim2,claim3,equivalent,fully_equivalent,unsure,test_available,non_trivial_change,non_trivial_kill_method,comment
+,project,target_path,mutant_op,occurrence,claim1,claim2,claim3,equivalent,fully_equivalent,unsure,test_available,change,kill_method,comment
 1147,apimd,__main__.py,core/ReplaceComparisonOperator_Eq_Is,0,,,,0,0,0,1,"Turns ""=="" comparison to ""is"" with a string literal.",SyntaxWarning when no __pycache__ is present.,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
 905,apimd,__main__.py,core/ReplaceComparisonOperator_Eq_LtE,2,e49eee1c,e0e874a9,,0,0,0,1,,,"Mutant changes ""__name__  == '__main__'"" to ""__name__ <= '__main__'""."
 1328,apimd,compiler.py,core/AddNot,2,,,,1,0,1,1,(Mutant is not reachable.),Constructing object without a __class__ attribute.,"Detecting the mutant requires creating an object that pretends it doesn't have the ""__class__"" attribute."
