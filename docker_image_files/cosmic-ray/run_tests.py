@@ -135,7 +135,9 @@ def print_fail(module_name: str, result: TestResult):
         print("-" * 80)
 
 
-def run_tests(tests: List[Path]):
+def run_tests(tests: List[Path]) -> bool:
+    failed = False
+
     for test_path in tests:
         module_name = test_path.stem
 
@@ -162,15 +164,18 @@ def run_tests(tests: List[Path]):
                 )
 
         if test_result.failed:
+            failed = True
             print_fail(module_name, test_result)
             if baseline:
                 excluded_tests.add(module_name)
                 exclude_file.write_text(json.dumps(list(excluded_tests)))
             else:
                 if stop_after_first_fail:
-                    sys.exit(1)
+                    return True
         else:
             print(".", end="")
+
+    return failed
 
 
 # Read arguments
@@ -212,7 +217,7 @@ if command == "baseline":
 elif command == "test":
     baseline = False
     print(f"{COLOR_BLUE}Running tests{COLOR_END}")
-    run_tests(tests)
 
-# Fix missing newline
-print()
+    failed = run_tests(tests)
+    print()  # Fix missing newline
+    sys.exit(1 if failed else 0)

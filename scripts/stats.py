@@ -280,11 +280,17 @@ del cosmic_ray_results
 
 # %% Check which mutants are claimed equivalent by multiple runs and what runs they are claimed by
 
+
+class EquivalenceClaim(NamedTuple):
+    preset: str
+    id: str
+
+
 equivalence_claims = {}
 for index, row in data.iterrows():
     mutant_id = mutant_id_from_row(row)
     equivalence_claims[mutant_id] = equivalence_claims.get(mutant_id, []) + (
-        [row["id"]] if bool(row["claimed_equivalent"]) else []
+        [EquivalenceClaim(str(row["preset"]), str(row["id"]))] if bool(row["claimed_equivalent"]) else []
     )
 
 presets = list(data["preset"].unique())
@@ -1154,8 +1160,8 @@ print()
 
 sampled_mutants_per_preset = {}
 for index, row in sampled_mutants.iterrows():
-    for preset in row["mutant.equivalence_claims"]:
-        sampled_mutants_per_preset[preset] = sampled_mutants_per_preset.get(preset, []) + [preset]
+    for claim in row["mutant.equivalence_claims"]:
+        sampled_mutants_per_preset[claim.preset] = sampled_mutants_per_preset.get(claim.preset, []) + [claim.preset]
 for preset in data["preset"].unique():
     print(f"{len(sampled_mutants_per_preset.get(preset, [])):4d} mutants from {preset}")
 print()
@@ -1168,22 +1174,28 @@ column_mapping = {
     "problem.target_path": "target_path",
     "problem.mutant_op": "mutant_op",
     "problem.occurrence": "occurrence",
-    "mutant.equivalence_claims": "claimed_by",
+    "claim1": "claim1",
+    "claim2": "claim2",
+    "claim3": "claim3",
 }
 
-sampled_mutants["mutant.equivalence_claims"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
-    ", ".join
+sampled_mutants["claim1"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
+    lambda l: l[0].id if len(l) > 0 else None
+)
+sampled_mutants["claim2"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
+    lambda l: l[1].id if len(l) > 1 else None
+)
+sampled_mutants["claim3"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
+    lambda l: l[2].id if len(l) > 2 else None
 )
 
 sampled_mutants = cast(pd.DataFrame, sampled_mutants).sort_values(
     by=["project", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
 )
 
-sampled_mutants.rename(columns=column_mapping).assign(
-    equivalent_private=None, equivalent_public=None, comment=None
-).to_csv(
+sampled_mutants.rename(columns=column_mapping).assign(equivalent=None, unsure=None, comment=None).to_csv(
     OUTPUT_PATH / "sampled_mutants.csv",
-    columns=[*column_mapping.values(), "equivalent_private", "equivalent_public", "comment"],
+    columns=[*column_mapping.values(), "equivalent", "unsure", "comment"],
 )
 
 
