@@ -1,0 +1,66 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        core._is_collection = lambda x: True
+        try:
+>           _decode_dataclass(A, dict(value="value"), True)
+
+../test.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+dataclasses_json/core.py:201: in _decode_dataclass
+    init_kwargs[field.name] = _decode_generic(field_type,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+type_ = <class 'test.MockString'>, value = 'value', infer_missing = True
+
+    def _decode_generic(type_, value, infer_missing):
+        if value is None:
+            res = value
+        elif _issubclass_safe(type_, Enum):
+            # Convert to an Enum using the type as a constructor.
+            # Assumes a direct match is found.
+            res = type_(value)
+        # FIXME this is a hack to fix a deeper underlying issue. A refactor is due.
+        elif _is_collection(type_):
+            if _is_mapping(type_):
+                k_type, v_type = getattr(type_, "__args__", (Any, Any))
+                # a mapping type has `.keys()` and `.values()`
+                # (see collections.abc)
+                ks = _decode_dict_keys(k_type, value.keys(), infer_missing)
+                vs = _decode_items(v_type, value.values(), infer_missing)
+                xs = zip(ks, vs)
+            else:
+>               xs = _decode_items(type_.__args__[0], value, infer_missing)
+E               IndexError: list index out of range
+
+dataclasses_json/core.py:258: IndexError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        core._is_collection = lambda x: True
+        try:
+            _decode_dataclass(A, dict(value="value"), True)
+        except IndexError:
+>           assert False
+E           assert False
+
+../test.py:29: AssertionError
+=============================== warnings summary ===============================
+../../../../home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247
+  /home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247: DeprecationWarning: invalid escape sequence \W
+    return re.sub("\W+", "", string)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.10s =========================

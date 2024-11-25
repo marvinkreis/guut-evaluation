@@ -1,0 +1,49 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        try:
+>           get_content_type("some.json.gz")
+
+../test.py:6: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+filename = 'some.json.gz'
+
+    def get_content_type(filename):
+        """
+        Return the content type for ``filename`` in format appropriate
+        for Content-Type headers, or ``None`` if the file type is unknown
+        to ``mimetypes``.
+    
+        """
+        mime, encoding = mimetypes.guess_type(filename, strict=False)
+        if mime:
+            content_type = mime
+            if encoding:
+>               content_type = '%s; charset=%s' << (mime, encoding)
+E               TypeError: unsupported operand type(s) for <<: 'str' and 'tuple'
+
+httpie/utils.py:88: TypeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        try:
+            get_content_type("some.json.gz")
+        except TypeError:
+>           assert False
+E           assert False
+
+../test.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.18s ===============================

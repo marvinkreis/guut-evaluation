@@ -1,0 +1,47 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        try:
+>           parse("", A())
+
+../test.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+text = '', style = <test.A object at 0x74d2b25add30>
+
+    def parse(text: str, style: Style = Style.auto) -> Docstring:
+        """Parse the docstring into its components.
+    
+        :param text: docstring text to parse
+        :param style: docstring style
+        :returns: parsed docstring representation
+        """
+    
+        if style is not Style.auto:
+>           return STYLES[style](text)
+E           KeyError: <test.A object at 0x74d2b25add30>
+
+docstring_parser/parser.py:16: KeyError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        try:
+            parse("", A())
+        except KeyError:
+>           assert False
+E           assert False
+
+../test.py:16: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.03s ===============================

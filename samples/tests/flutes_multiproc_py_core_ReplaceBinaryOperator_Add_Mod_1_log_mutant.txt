@@ -1,0 +1,35 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+>       pool = StatefulPool(MockPool, MockState, (), (1,2), {})
+
+../test.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+flutes/multiproc.py:345: in __init__
+    self._pool = pool_class(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test.MockPool object at 0x709b978111f0>
+args = (1, functools.partial(<function _pool_state_init at 0x709b97d12040>, <class 'test.MockState'>), ())
+kwargs = {}, @py_assert2 = 3, @py_assert5 = 2, @py_assert4 = False
+@py_format7 = "3\n{3 = len((1, functools.partial(<function _pool_state_init at 0x709b97d12040>, <class 'test.MockState'>), ()))\n} == 2"
+@py_format9 = "assert 3\n{3 = len((1, functools.partial(<function _pool_state_init at 0x709b97d12040>, <class 'test.MockState'>), ()))\n} == 2"
+
+    def __init__(self, *args, **kwargs):
+>       assert len(args) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len((1, functools.partial(<function _pool_state_init at 0x709b97d12040>, <class 'test.MockState'>), ()))
+
+../test.py:6: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert 3 == 2
+============================== 1 failed in 0.09s ===============================

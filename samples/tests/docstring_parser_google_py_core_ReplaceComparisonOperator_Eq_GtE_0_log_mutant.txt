@@ -1,0 +1,57 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        parser = GoogleParser(sections=[Section("Name", "param", 4)])
+        try:
+>           parser._build_meta("a : 1", "Name")
+
+../test.py:8: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docstring_parser/google.py:103: in _build_meta
+    return self._build_single_meta(section, text)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <docstring_parser.google.GoogleParser object at 0x715765b6bb20>
+section = Section(title='Name', key='param', type=4), desc = 'a : 1'
+
+    def _build_single_meta(self, section: Section, desc: str) -> DocstringMeta:
+        if section.key in RETURNS_KEYWORDS | YIELDS_KEYWORDS:
+            return DocstringReturns(
+                args=[section.key],
+                description=desc,
+                type_name=None,
+                is_generator=section.key in YIELDS_KEYWORDS,
+            )
+        if section.key in RAISES_KEYWORDS:
+            return DocstringRaises(
+                args=[section.key], description=desc, type_name=None
+            )
+        if section.key in PARAM_KEYWORDS:
+>           raise ParseError("Expected paramenter name.")
+E           docstring_parser.common.ParseError: Expected paramenter name.
+
+docstring_parser/google.py:129: ParseError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        parser = GoogleParser(sections=[Section("Name", "param", 4)])
+        try:
+            parser._build_meta("a : 1", "Name")
+        except ParseError:
+>           assert False
+E           assert False
+
+../test.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.04s ===============================

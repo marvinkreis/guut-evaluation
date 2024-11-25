@@ -1,0 +1,24 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        warnings.filterwarnings("error")
+        # importing without __pycache__ present raises a SyntaxWarning
+>       import flake8.plugins.pyflakes
+E         File "/mnt/temp/inspect_mutant/flake8_mutant/src/flake8/plugins/pyflakes.py", line 167
+E           if excluded_file is "":
+E              ^
+E       SyntaxError: "is" with a literal. Did you mean "=="?
+
+../../test.py:7: SyntaxError
+=========================== short test summary info ============================
+FAILED ../../test.py::test -   File "/mnt/temp/inspect_mutant/flake8_mutant/s...
+============================== 1 failed in 0.03s ===============================

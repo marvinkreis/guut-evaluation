@@ -1,0 +1,31 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        class A:
+            def __repr__(self):
+                raise Exception()
+    
+        out = StringIO()
+        logging.getLogger().addHandler(logging.StreamHandler(out))
+        load_file("", A())
+>       assert "__repr__" in out.getvalue()
+E       AssertionError: assert '__repr__' in 'In load_file\nsys_modules[get_name(mod)] = mod\n\n'
+E        +  where 'In load_file\nsys_modules[get_name(mod)] = mod\n\n' = <built-in method getvalue of _io.StringIO object at 0x72f84e3cc280>()
+E        +    where <built-in method getvalue of _io.StringIO object at 0x72f84e3cc280> = <_io.StringIO object at 0x72f84e3cc280>.getvalue
+
+../test.py:15: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  root:compiler.py:395 In load_file
+sys_modules[get_name(mod)] = mod
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert '__repr__' in 'In load_file\...
+============================== 1 failed in 0.03s ===============================

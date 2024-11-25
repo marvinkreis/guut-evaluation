@@ -1,0 +1,16 @@
+Running test on baseline:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py <function fun at 0x71fb7e000040>
+.
+
+=============================== warnings summary ===============================
+test.py::test
+  /mnt/temp/inspect_mutant/flake8/src/flake8/utils.py:409: DeprecationWarning: inspect.getargspec() is deprecated since Python 3.0, use inspect.signature() or inspect.getfullargspec()
+    argspec = inspect.getargspec(func)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 1 passed, 1 warning in 0.01s =========================

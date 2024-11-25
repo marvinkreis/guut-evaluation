@@ -1,0 +1,104 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py usage: __main__.py
+__main__.py: error: --continue only works with --download
+F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        parser = HTTPieArgumentParser()
+        try:
+>           parser.parse_args(Environment(),
+                args=[],
+                namespace=SimpleNamespace(debug=False,
+                ignore_stdin=False,
+                request_type="no",
+                offline=False,
+                download=True,
+                download_resume=True,
+                output_file=True,
+                quiet=True,
+                verbose=False,
+                output_options={},
+                output_options_history={},
+                prettify="all",
+                format_options=None,
+                method=None,
+                request_items=[],
+                url="example.org",
+                default_scheme="https",
+                auth_type=None,
+                auth=None,
+                ignore_netrc=True,
+                compress=False))
+
+../test.py:9: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/cli/argparser.py:87: in parse_args
+    self._process_download_options()
+httpie/cli/argparser.py:435: in _process_download_options
+    self.error('--continue only works with --download')
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/argparse.py:2521: in error
+    self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = HTTPieArgumentParser(prog='__main__.py', usage=None, description=None, formatter_class=<class 'httpie.cli.argparser.HTTPieHelpFormatter'>, conflict_handler='error', add_help=False)
+status = 2
+message = '__main__.py: error: --continue only works with --download\n'
+
+    def exit(self, status=0, message=None):
+        if message:
+            self._print_message(message, _sys.stderr)
+>       _sys.exit(status)
+E       SystemExit: 2
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/argparse.py:2508: SystemExit
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        parser = HTTPieArgumentParser()
+        try:
+            parser.parse_args(Environment(),
+                args=[],
+                namespace=SimpleNamespace(debug=False,
+                ignore_stdin=False,
+                request_type="no",
+                offline=False,
+                download=True,
+                download_resume=True,
+                output_file=True,
+                quiet=True,
+                verbose=False,
+                output_options={},
+                output_options_history={},
+                prettify="all",
+                format_options=None,
+                method=None,
+                request_items=[],
+                url="example.org",
+                default_scheme="https",
+                auth_type=None,
+                auth=None,
+                ignore_netrc=True,
+                compress=False))
+        except SystemExit:
+>           assert False
+E           assert False
+
+../test.py:33: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.48s =========================

@@ -1,0 +1,18 @@
+Running test on baseline:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+1 <PluginManager: [<class 'httpie.plugins.builtin.BasicAuthPlugin'>, <class 'httpie.plugins.builtin.DigestAuthPlugin'>, <class 'httpie.output.formatters.headers.HeadersFormatter'>, <class 'httpie.output.formatters.json.JSONFormatter'>, <class 'httpie.output.formatters.colors.ColorFormatter'>]>
+collected 1 item
+
+../test.py 1 <PluginManager: [<class 'httpie.plugins.builtin.BasicAuthPlugin'>, <class 'httpie.plugins.builtin.DigestAuthPlugin'>, <class 'httpie.output.formatters.headers.HeadersFormatter'>, <class 'httpie.output.formatters.json.JSONFormatter'>, <class 'httpie.output.formatters.colors.ColorFormatter'>, <class 'test.A'>]>
+2 <PluginManager: [<class 'httpie.plugins.builtin.BasicAuthPlugin'>, <class 'httpie.plugins.builtin.DigestAuthPlugin'>, <class 'httpie.output.formatters.headers.HeadersFormatter'>, <class 'httpie.output.formatters.json.JSONFormatter'>, <class 'httpie.output.formatters.colors.ColorFormatter'>, <class 'test.A'>]>
+.
+
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 1 passed, 1 warning in 0.40s =========================

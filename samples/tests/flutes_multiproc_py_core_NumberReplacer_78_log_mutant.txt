@@ -1,0 +1,38 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        Proxy = ProgressBarManager.Proxy
+        queue = MockQueue()
+        p = Proxy(queue)
+    
+        def assert_update(n):
+            assert n == 4
+        p.update = assert_update
+    
+>       print(list(p._iter_per_percentage([], 4, .1)))
+
+../test.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+flutes/multiproc.py:952: in _iter_per_percentage
+    self.update(length - prev_index - 1)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+n = 5
+
+    def assert_update(n):
+>       assert n == 4
+E       assert 5 == 4
+
+../test.py:19: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert 5 == 4
+============================== 1 failed in 0.10s ===============================

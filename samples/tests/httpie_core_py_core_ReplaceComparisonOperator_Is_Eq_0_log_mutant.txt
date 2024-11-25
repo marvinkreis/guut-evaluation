@@ -1,0 +1,51 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        try:
+>           decode_raw_args([MockBytes(123)], "utf-8")
+
+../test.py:15: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/core.py:243: in decode_raw_args
+    return [
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0x78dd4f4b3b80>
+
+    return [
+>       arg.decode(stdin_encoding)
+        if type(arg) == bytes else arg
+        for arg in args
+    ]
+E   AttributeError: 'MockBytes' object has no attribute 'decode'
+
+httpie/core.py:244: AttributeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        try:
+            decode_raw_args([MockBytes(123)], "utf-8")
+        except AttributeError:
+>           assert False
+E           assert False
+
+../test.py:17: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.51s =========================

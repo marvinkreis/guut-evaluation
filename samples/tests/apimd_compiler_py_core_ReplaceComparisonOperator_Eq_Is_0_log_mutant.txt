@@ -1,0 +1,55 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        import warnings
+        warnings.filterwarnings("error")
+    
+        try:
+            # importing without __pycache__ present raises a SyntaxWarning
+>           from apimd.compiler import get_name
+
+../test.py:7: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """A Python API compiler for universal Markdown syntax."""
+    
+    __author__ = "Yuan Chang"
+    __copyright__ = "Copyright (C) 2020"
+    __license__ = "MIT"
+    __email__ = "pyslvs@gmail.com"
+    __version__ = "1.2.1"
+    
+>   from .compiler import gen_api
+E     File "/mnt/temp/inspect_mutant/apimd_mutant/apimd/compiler.py", line 64
+E       if obj.__module__ is 'builtins':
+E          ^
+E   SyntaxError: "is" with a literal. Did you mean "=="?
+
+apimd/__init__.py:11: SyntaxError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        import warnings
+        warnings.filterwarnings("error")
+    
+        try:
+            # importing without __pycache__ present raises a SyntaxWarning
+            from apimd.compiler import get_name
+        except SyntaxError:
+>           assert False
+E           assert False
+
+../test.py:9: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.03s ===============================

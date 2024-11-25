@@ -1,0 +1,40 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        class MockParser:
+            def add_option(self, *args, **kwargs):
+                if "normalize_paths" in kwargs:
+                    assert kwargs["normalize_paths"]
+    
+        parser = MockParser()
+>       FlakesChecker.add_options(parser)
+
+../../test.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+flake8/plugins/pyflakes.py:138: in add_options
+    parser.add_option(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test.test.<locals>.MockParser object at 0x72aba9feb430>
+args = ('--exclude-from-doctest',)
+kwargs = {'comma_separated_list': True, 'default': '', 'dest': 'exclude_from_doctest', 'help': 'Skip these files when running doctests', ...}
+@py_assert0 = False, @py_format2 = 'assert False'
+
+    def add_option(self, *args, **kwargs):
+        if "normalize_paths" in kwargs:
+>           assert kwargs["normalize_paths"]
+E           assert False
+
+../../test.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - assert False
+============================== 1 failed in 0.05s ===============================

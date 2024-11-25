@@ -1,0 +1,31 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        log = []
+    
+        @Timer(text="{seconds},{milliseconds}", logger=log.append)
+        def timed_fun():
+            time.sleep(.001)
+            pass
+    
+        timed_fun()
+        seconds = float(log[0].split(",")[0])
+        milliseconds = float(log[0].split(",")[1])
+    
+>       assert abs((seconds * 1000) - milliseconds) < 0.001
+E       assert 0.0010638600215315819 < 0.001
+E        +  where 0.0010638600215315819 = abs(((0.0010638600215315819 * 1000) - 1.0649238815531135))
+
+../test.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert 0.0010638600215315819 < 0.001
+============================== 1 failed in 0.03s ===============================

@@ -1,0 +1,70 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        with flutes.safe_pool(processes=4, state_class=MockState) as pool_stateful:
+            try:
+>               pool_stateful.broadcast(MockState.simple_fn)
+
+../test.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <flutes.multiproc.StatefulPool object at 0x784e0a545a90>
+fn = <function MockState.simple_fn at 0x784e0ab67280>
+
+    def broadcast(self, fn: Callable[[State], R], *, args: Iterable[Any] = (), kwds: Mapping[str, Any] = {}) -> List[R]:
+        r"""Broadcast a function to each pool worker, and gather results.
+    
+        :param fn: The function to broadcast.
+        :param args: Positional arguments to apply to the function.
+        :param kwds: Keyword arguments to apply to the function.
+        :return: The broadcast result from each worker process. Order is arbitrary.
+        """
+        if self._pool._state != mp.pool.RUN:
+            raise ValueError("Pool not running")
+        _ = self._wrap_fn(fn, allow_function=False)  # ensure that the function is an unbound method
+        if isinstance(self._pool, DummyPool):
+            return [fn(self._pool._process_state, *args, **kwds)]
+        assert isinstance(self._pool, Pool)
+    
+        # Initialize the worker states.
+        received_ids: Set[int] = set()
+        n_processes = self._pool._processes
+        broadcast_init_fn = functools.partial(_pool_fn_with_state, self._init_broadcast)
+        while len(received_ids) < n_processes:
+            init_ids: List[int] = self._pool.map(broadcast_init_fn, range(n_processes))  # type: ignore[arg-type]
+            received_ids.update(init_ids)
+    
+        # Perform broadcast.
+        received_ids: Set[int] = set()
+        broadcast_results = []
+        broadcast_handler_fn = functools.partial(_pool_fn_with_state, self._apply_broadcast)
+        while len(received_ids) < n_processes:
+            results: List[Optional[Tuple[R, int]]] = self._pool.map(
+>               broadcast_handler_fn, [fn] ^ n_processes, args=args, kwds=kwds)  # type: ignore[arg-type]
+E           TypeError: unsupported operand type(s) for ^: 'list' and 'int'
+
+flutes/multiproc.py:434: TypeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        with flutes.safe_pool(processes=4, state_class=MockState) as pool_stateful:
+            try:
+                pool_stateful.broadcast(MockState.simple_fn)
+            except TypeError:
+>               assert False
+E               assert False
+
+../test.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.10s ===============================

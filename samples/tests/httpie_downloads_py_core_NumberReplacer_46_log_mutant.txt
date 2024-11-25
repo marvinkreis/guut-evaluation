@@ -1,0 +1,36 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        output = StringIO()
+        prt = downloads.ProgressReporterThread(SimpleNamespace(
+            downloaded=1,
+            total_size=MockInt(0),
+        ), output)
+    
+        prt._prev_time -= prt._update_interval
+        prt.report_speed()
+    
+>       assert "0.00 %" in output.getvalue()
+E       AssertionError: assert '0.00 %' in '\r\x1b[K |   1.00 %        1 B     1.00 B/s -1:59:59 ETA'
+E        +  where '\r\x1b[K |   1.00 %        1 B     1.00 B/s -1:59:59 ETA' = <built-in method getvalue of _io.StringIO object at 0x770650426af0>()
+E        +    where <built-in method getvalue of _io.StringIO object at 0x770650426af0> = <_io.StringIO object at 0x770650426af0>.getvalue
+
+../test.py:21: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert '0.00 %' in '\r\x1b[K |   1....
+========================= 1 failed, 1 warning in 0.43s =========================

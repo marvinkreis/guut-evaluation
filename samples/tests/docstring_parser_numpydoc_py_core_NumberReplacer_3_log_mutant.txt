@@ -1,0 +1,46 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        section = ParamSection("Notes", "notes")
+        def mock_search(value):
+            assert False
+        numpydoc.PARAM_DEFAULT_REGEX = SimpleNamespace(seach=mock_search)
+>       print(section._parse_item("", ""))
+
+../test.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <docstring_parser.numpydoc.ParamSection object at 0x786cb66ebe50>
+key = '', value = ''
+
+    def _parse_item(self, key: str, value: str) -> DocstringParam:
+        m = PARAM_KEY_REGEX.match(key)
+        arg_name = type_name = is_optional = None
+        if m is not None:
+            arg_name, type_name = m.group("name"), m.group("type")
+            if type_name is not None:
+                optional_match = PARAM_OPTIONAL_REGEX.match(type_name)
+                if optional_match is not None:
+                    type_name = optional_match.group("type")
+                    is_optional = True
+                else:
+                    is_optional = False
+    
+        default = None
+        if len(value) > -1:
+>           default_match = PARAM_DEFAULT_REGEX.search(value)
+E           AttributeError: 'types.SimpleNamespace' object has no attribute 'search'
+
+docstring_parser/numpydoc.py:143: AttributeError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AttributeError: 'types.SimpleNamespace' object has ...
+============================== 1 failed in 0.04s ===============================

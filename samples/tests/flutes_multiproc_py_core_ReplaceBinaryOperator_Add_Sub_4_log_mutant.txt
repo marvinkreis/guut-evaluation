@@ -1,0 +1,35 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+>       pool = StatefulPool(MockPool, MockState, (), (1,2,3,4), {})
+
+../test.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+flutes/multiproc.py:345: in __init__
+    self._pool = pool_class(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test.MockPool object at 0x7ceaa4b52190>
+args = (1, functools.partial(<function _chain_fns at 0x7ceaa4f051f0>, fns=[functools.partial(<function _pool_state_init at 0x...51f0>, fns=[functools.partial(<function _pool_state_init at 0x7ceaa4d97040>, <class 'test.MockState'>), 2]), 1, 2, ...)
+kwargs = {}, @py_assert2 = 8, @py_assert5 = 4, @py_assert4 = False
+@py_format7 = "8\n{8 = len((1, functools.partial(<function _chain_fns at 0x7ceaa4f051f0>, fns=[functools.partial(<function _pool_sta...=[functools.partial(<function _pool_state_init at 0x7ceaa4d97040>, <class 'test.MockState'>), 2]), 1, 2, ...))\n} == 4"
+@py_format9 = "assert 8\n{8 = len((1, functools.partial(<function _chain_fns at 0x7ceaa4f051f0>, fns=[functools.partial(<function _p...=[functools.partial(<function _pool_state_init at 0x7ceaa4d97040>, <class 'test.MockState'>), 2]), 1, 2, ...))\n} == 4"
+
+    def __init__(self, *args, **kwargs):
+>       assert len(args) == 4
+E       AssertionError: assert 8 == 4
+E        +  where 8 = len((1, functools.partial(<function _chain_fns at 0x7ceaa4f051f0>, fns=[functools.partial(<function _pool_state_init at 0x...51f0>, fns=[functools.partial(<function _pool_state_init at 0x7ceaa4d97040>, <class 'test.MockState'>), 2]), 1, 2, ...))
+
+../test.py:6: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert 8 == 4
+============================== 1 failed in 0.10s ===============================

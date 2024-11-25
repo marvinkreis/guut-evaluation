@@ -1,0 +1,29 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        def mock_search(text):
+            global i
+            i += 1
+            return None
+    
+        defaults.NOQA_INLINE_REGEXP = SimpleNamespace(search=mock_search)
+    
+        for j in range(2):
+            for k in range(513):
+                find_noqa(f"# noqa: E{k}")
+>       assert i > 513
+E       assert 513 > 513
+
+../../test.py:18: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - assert 513 > 513
+============================== 1 failed in 0.03s ===============================

@@ -1,0 +1,25 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        out = StringIO()
+        err = StringIO()
+        with redirect_stdout(out):
+            from string_utils._regex import PRETTIFY_RE
+>       assert not out.getvalue()
+E       AssertionError: assert not 'SUBPATTERN 1 0 0\n  BRANCH\n    ASSERT -1\n      IN\n        NEGATE None\n        CATEGORY CATEGORY_SPACE\n        CA...RT_NOT 4 0 (to 636)\n634.     ANY\n635.     SUCCESS\n636:   JUMP 2 (to 639)\n638: FAILURE\n639: MARK 1\n641. SUCCESS\n'
+E        +  where 'SUBPATTERN 1 0 0\n  BRANCH\n    ASSERT -1\n      IN\n        NEGATE None\n        CATEGORY CATEGORY_SPACE\n        CA...RT_NOT 4 0 (to 636)\n634.     ANY\n635.     SUCCESS\n636:   JUMP 2 (to 639)\n638: FAILURE\n639: MARK 1\n641. SUCCESS\n' = <built-in method getvalue of _io.StringIO object at 0x7fca91e4f310>()
+E        +    where <built-in method getvalue of _io.StringIO object at 0x7fca91e4f310> = <_io.StringIO object at 0x7fca91e4f310>.getvalue
+
+../test.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert not 'SUBPATTERN 1 0 0\n  BRA...
+============================== 1 failed in 0.05s ===============================

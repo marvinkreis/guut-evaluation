@@ -1,0 +1,24 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        a = Timers()
+        a.data[""] = []
+        a._timings[""] = []
+>       assert a.median("") == 0
+E       AssertionError: assert 1 == 0
+E        +  where 1 = median('')
+E        +    where median = {'': []}.median
+
+../test.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert 1 == 0
+============================== 1 failed in 0.03s ===============================

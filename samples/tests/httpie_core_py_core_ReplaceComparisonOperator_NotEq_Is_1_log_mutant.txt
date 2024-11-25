@@ -1,0 +1,32 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        core.program = lambda args, env: sys.exit(1)
+        stderr = io.StringIO()
+        env = Environment()
+        env.stderr = stderr
+        core.main("-v xxx".split(), env)
+>       assert stderr.getvalue()
+E       AssertionError: assert ''
+E        +  where '' = <built-in method getvalue of _io.StringIO object at 0x7245071c00d0>()
+E        +    where <built-in method getvalue of _io.StringIO object at 0x7245071c00d0> = <_io.StringIO object at 0x7245071c00d0>.getvalue
+
+../test.py:14: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert ''
+========================= 1 failed, 1 warning in 0.48s =========================

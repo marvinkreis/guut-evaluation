@@ -1,0 +1,128 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        try:
+>           A(1, a=1)
+
+../test.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+dataclasses_json/undefined.py:228: in _catch_all_init
+    bound_parameters = init_signature.bind_partial(self, *args,
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/inspect.py:3044: in bind_partial
+    return self._bind(args, kwargs, partial=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Signature (self, a: int, catchall: Union[~CatchAllVar, NoneType]) -> None>
+args = (<[AttributeError("'A' object has no attribute 'a'") raised in repr()] A object at 0x7fba709559d0>, 1)
+kwargs = {'a': 1}
+
+    def _bind(self, args, kwargs, *, partial=False):
+        """Private method. Don't use directly."""
+    
+        arguments = OrderedDict()
+    
+        parameters = iter(self.parameters.values())
+        parameters_ex = ()
+        arg_vals = iter(args)
+    
+        while True:
+            # Let's iterate through the positional arguments and corresponding
+            # parameters
+            try:
+                arg_val = next(arg_vals)
+            except StopIteration:
+                # No more positional arguments
+                try:
+                    param = next(parameters)
+                except StopIteration:
+                    # No more parameters. That's it. Just need to check that
+                    # we have no `kwargs` after this while loop
+                    break
+                else:
+                    if param.kind == _VAR_POSITIONAL:
+                        # That's OK, just empty *args.  Let's start parsing
+                        # kwargs
+                        break
+                    elif param.name in kwargs:
+                        if param.kind == _POSITIONAL_ONLY:
+                            msg = '{arg!r} parameter is positional only, ' \
+                                  'but was passed as a keyword'
+                            msg = msg.format(arg=param.name)
+                            raise TypeError(msg) from None
+                        parameters_ex = (param,)
+                        break
+                    elif (param.kind == _VAR_KEYWORD or
+                                                param.default is not _empty):
+                        # That's fine too - we have a default value for this
+                        # parameter.  So, lets start parsing `kwargs`, starting
+                        # with the current parameter
+                        parameters_ex = (param,)
+                        break
+                    else:
+                        # No default, not VAR_KEYWORD, not VAR_POSITIONAL,
+                        # not in `kwargs`
+                        if partial:
+                            parameters_ex = (param,)
+                            break
+                        else:
+                            msg = 'missing a required argument: {arg!r}'
+                            msg = msg.format(arg=param.name)
+                            raise TypeError(msg) from None
+            else:
+                # We have a positional argument to process
+                try:
+                    param = next(parameters)
+                except StopIteration:
+                    raise TypeError('too many positional arguments') from None
+                else:
+                    if param.kind in (_VAR_KEYWORD, _KEYWORD_ONLY):
+                        # Looks like we have no parameter for this positional
+                        # argument
+                        raise TypeError(
+                            'too many positional arguments') from None
+    
+                    if param.kind == _VAR_POSITIONAL:
+                        # We have an '*args'-like argument, let's fill it with
+                        # all positional arguments we have left and move on to
+                        # the next phase
+                        values = [arg_val]
+                        values.extend(arg_vals)
+                        arguments[param.name] = tuple(values)
+                        break
+    
+                    if param.name in kwargs and param.kind != _POSITIONAL_ONLY:
+>                       raise TypeError(
+                            'multiple values for argument {arg!r}'.format(
+                                arg=param.name)) from None
+E                       TypeError: multiple values for argument 'a'
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/inspect.py:2976: TypeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        try:
+            A(1, a=1)
+        except TypeError:
+>           assert False
+E           assert False
+
+../test.py:16: AssertionError
+=============================== warnings summary ===============================
+../../../../home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247
+  /home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247: DeprecationWarning: invalid escape sequence \W
+    return re.sub("\W+", "", string)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.15s =========================

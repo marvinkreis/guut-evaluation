@@ -1,0 +1,66 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        plugin_manager.register(A)
+    
+        try:
+>           from httpie.cli.definition import auth
+
+../test.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/cli/definition.py:540: in <module>
+    '''.format(default=_auth_plugins[0].auth_type, types='\n    '.join(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0x7eb28c6a9580>
+
+        '''.format(default=_auth_plugins[0].auth_type, types='\n    '.join(
+            '"{type}": {name}{package}{description}'.format(
+                type=plugin.auth_type,
+                name=plugin.name,
+                package=(
+                    '' if issubclass(plugin, BuiltinAuthPlugin)
+                    else ' (provided by %s)' % plugin.package_name
+                ),
+                description=(
+                    '' if not plugin.description else
+>                   '\n      ' | ('\n      '.join(wrap(plugin.description)))
+                )
+            )
+            for plugin in _auth_plugins
+        )),
+    )
+E   TypeError: unsupported operand type(s) for |: 'str' and 'str'
+
+httpie/cli/definition.py:550: TypeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        plugin_manager.register(A)
+    
+        try:
+            from httpie.cli.definition import auth
+        except TypeError:
+>           assert False
+E           assert False
+
+../test.py:14: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.48s =========================

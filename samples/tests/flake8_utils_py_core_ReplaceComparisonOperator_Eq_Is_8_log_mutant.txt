@@ -1,0 +1,23 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        with patch("inspect.signature", return_value=SimpleNamespace(parameters={"a": SimpleNamespace(kind=[], POSITIONAL_OR_KEYWORD=[], name="", default=[], empty=[])})):
+>           assert utils.parameters_for(SimpleNamespace(plugin=None))
+E           assert OrderedDict()
+E            +  where OrderedDict() = <function parameters_for at 0x70f03f452940>(namespace(plugin=None))
+E            +    where <function parameters_for at 0x70f03f452940> = utils.parameters_for
+E            +    and   namespace(plugin=None) = SimpleNamespace(plugin=None)
+
+../../test.py:18: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - assert OrderedDict()
+============================== 1 failed in 0.03s ===============================

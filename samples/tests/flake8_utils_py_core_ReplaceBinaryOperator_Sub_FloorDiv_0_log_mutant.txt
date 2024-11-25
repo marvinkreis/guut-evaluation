@@ -1,0 +1,73 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        sys.version_info = (3, 2)
+    
+        try:
+>           parameters_for(MockPlugin)
+
+../../test.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+plugin = <class 'test.MockPlugin'>
+
+    def parameters_for(plugin):
+        # type: (Plugin) -> Dict[str, bool]
+        """Return the parameters for the plugin.
+    
+        This will inspect the plugin and return either the function parameters
+        if the plugin is a function or the parameters for ``__init__`` after
+        ``self`` if the plugin is a class.
+    
+        :param plugin:
+            The internal plugin object.
+        :type plugin:
+            flake8.plugins.manager.Plugin
+        :returns:
+            A dictionary mapping the parameter name to whether or not it is
+            required (a.k.a., is positional only/does not have a default).
+        :rtype:
+            dict([(str, bool)])
+        """
+        func = plugin.plugin
+        is_class = not inspect.isfunction(func)
+        if is_class:  # The plugin is a class
+            func = plugin.plugin.__init__
+    
+        if sys.version_info < (3, 3):
+            argspec = inspect.getargspec(func)
+>           start_of_optional_args = len(argspec[0]) // len(argspec[-1] or [])
+E           ZeroDivisionError: integer division or modulo by zero
+
+flake8/utils.py:409: ZeroDivisionError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        sys.version_info = (3, 2)
+    
+        try:
+            parameters_for(MockPlugin)
+        except ZeroDivisionError:
+>           assert False
+E           assert False
+
+../../test.py:18: AssertionError
+=============================== warnings summary ===============================
+test.py::test
+  /mnt/temp/inspect_mutant/flake8_mutant/src/flake8/utils.py:408: DeprecationWarning: inspect.getargspec() is deprecated since Python 3.0, use inspect.signature() or inspect.getfullargspec()
+    argspec = inspect.getargspec(func)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.03s =========================

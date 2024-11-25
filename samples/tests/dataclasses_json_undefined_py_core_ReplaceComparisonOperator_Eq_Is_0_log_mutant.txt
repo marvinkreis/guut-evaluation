@@ -1,0 +1,69 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+>       result = A.from_dict({"a": 1, "undefined_attribute" : 1, "catchall": DefaultObject(1)})
+
+../test.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+dataclasses_json/api.py:83: in from_dict
+    return _decode_dataclass(cls, kvs, infer_missing)
+dataclasses_json/core.py:149: in _decode_dataclass
+    kvs = _handle_undefined_parameters_safe(cls, kvs, usage="from")
+dataclasses_json/utils.py:139: in _handle_undefined_parameters_safe
+    return undefined_parameter_action.value.handle_from_dict(cls=cls,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cls = <class 'test.A'>
+kvs = {'a': 1, 'catchall': <test.DefaultObject object at 0x79d435e53ca0>, 'undefined_attribute': 1}
+
+    @staticmethod
+    def handle_from_dict(cls, kvs: Dict) -> Dict[str, Any]:
+        known, unknown = _UndefinedParameterAction \
+            ._separate_defined_undefined_kvs(cls=cls, kvs=kvs)
+        catch_all_field = _CatchAllUndefinedParameters._get_catch_all_field(
+            cls=cls)
+    
+        if catch_all_field.name in known:
+    
+            already_parsed = isinstance(known[catch_all_field.name], dict)
+            default_value = _CatchAllUndefinedParameters._get_default(
+                catch_all_field=catch_all_field)
+            received_default = default_value is known[catch_all_field.name]
+    
+            value_to_write: Any
+            if received_default and len(unknown) == 0:
+                value_to_write = default_value
+            elif received_default and len(unknown) > 0:
+                value_to_write = unknown
+            elif already_parsed:
+                # Did not receive default
+                value_to_write = known[catch_all_field.name]
+                if len(unknown) > 0:
+                    value_to_write.update(unknown)
+            else:
+                error_message = f"Received input field with " \
+                                f"same name as catch-all field: " \
+                                f"'{catch_all_field.name}': " \
+                                f"'{known[catch_all_field.name]}'"
+>               raise UndefinedParameterError(error_message)
+E               dataclasses_json.undefined.UndefinedParameterError: Received input field with same name as catch-all field: 'catchall': '<test.DefaultObject object at 0x79d435e53ca0>'
+
+dataclasses_json/undefined.py:162: UndefinedParameterError
+=============================== warnings summary ===============================
+../../../../home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247
+  /home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247: DeprecationWarning: invalid escape sequence \W
+    return re.sub("\W+", "", string)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - dataclasses_json.undefined.UndefinedParameterError:...
+========================= 1 failed, 1 warning in 0.12s =========================

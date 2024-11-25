@@ -1,0 +1,43 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+______________________________ test_make_checkers ______________________________
+
+    def test_make_checkers():
+        style_guide = MagicMock(**{
+            'options.diff': False,
+            'options.jobs': JobsArgument("4"),
+            'options.filename': ["a"],
+            'options._running_from_vcs': True,
+        })
+        files = ['file1', 'file2']
+        checkplugins = MagicMock()
+        checkplugins.to_dictionary.return_value = {
+            'ast_plugins': [],
+            'logical_line_plugins': [],
+            'physical_line_plugins': [],
+        }
+        with patch('flake8.checker.multiprocessing', None):
+            manager = Manager(style_guide, files, checkplugins)
+    
+        with patch('flake8.utils.filenames_from') as filenames_from:
+            filenames_from.side_effect = [['#'], ['file1']]
+            with patch('flake8.processor.FileProcessor'):
+                manager.make_checkers()
+    
+>       assert not manager._all_checkers
+E       assert not [FileChecker for #]
+E        +  where [FileChecker for #] = <flake8.checker.Manager object at 0x7c05fb370340>._all_checkers
+
+../../test.py:30: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  flake8.checker:checker.py:119 The multiprocessing module is not available. Ignoring --jobs arguments.
+=========================== short test summary info ============================
+FAILED ../../test.py::test_make_checkers - assert not [FileChecker for #]
+============================== 1 failed in 0.05s ===============================

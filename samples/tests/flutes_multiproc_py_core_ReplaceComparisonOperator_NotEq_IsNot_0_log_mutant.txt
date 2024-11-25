@@ -1,0 +1,55 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        pool = StatefulPool(MockPool, MockState, (), (1,2), {})
+        pool._pool = SimpleNamespace(_state=MockString(mp.pool.RUN))
+    
+        try:
+>           pool.broadcast(lambda x: 1)
+
+../test.py:26: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <flutes.multiproc.StatefulPool object at 0x78ce143f7be0>
+fn = <function test.<locals>.<lambda> at 0x78ce14397ee0>
+
+    def broadcast(self, fn: Callable[[State], R], *, args: Iterable[Any] = (), kwds: Mapping[str, Any] = {}) -> List[R]:
+        r"""Broadcast a function to each pool worker, and gather results.
+    
+        :param fn: The function to broadcast.
+        :param args: Positional arguments to apply to the function.
+        :param kwds: Keyword arguments to apply to the function.
+        :return: The broadcast result from each worker process. Order is arbitrary.
+        """
+        if self._pool._state is not mp.pool.RUN:
+>           raise ValueError("Pool not running")
+E           ValueError: Pool not running
+
+flutes/multiproc.py:414: ValueError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        pool = StatefulPool(MockPool, MockState, (), (1,2), {})
+        pool._pool = SimpleNamespace(_state=MockString(mp.pool.RUN))
+    
+        try:
+            pool.broadcast(lambda x: 1)
+        except ValueError as e:
+>           assert "Only unbound" in str(e)
+E           AssertionError: assert 'Only unbound' in 'Pool not running'
+E            +  where 'Pool not running' = str(ValueError('Pool not running'))
+
+../test.py:28: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert 'Only unbound' in 'Pool not ...
+============================== 1 failed in 0.09s ===============================

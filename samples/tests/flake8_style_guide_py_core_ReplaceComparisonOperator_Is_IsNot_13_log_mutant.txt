@@ -1,0 +1,86 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py 1111111111
+F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        options = argparse.Namespace(
+            select=[],
+            ignore=["E"],
+            extended_default_select=["X1"],
+            enable_extensions=[],
+            extend_ignore=[],
+            disable_noqa=False,
+        )
+    
+        decider = DecisionEngine(options)
+        decider.more_specific_decision_for = lambda: None
+    
+        try:
+>           decider.make_decision("E")
+
+../../test.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <flake8.style_guide.DecisionEngine object at 0x7d309d930040>, code = 'E'
+
+    def make_decision(self, code):
+        # type: (str) -> Decision
+        """Decide if code should be ignored or selected."""
+        LOG.debug('Deciding if "%s" should be reported', code)
+        selected = self.was_selected(code)
+        ignored = self.was_ignored(code)
+        LOG.debug(
+            'The user configured "%s" to be "%s", "%s"',
+            code,
+            selected,
+            ignored,
+        )
+    
+        if (
+            selected is Selected.Explicitly or selected is Selected.Implicitly
+        ) and ignored is Selected.Implicitly:
+            decision = Decision.Selected
+        elif (
+            selected is Selected.Explicitly and ignored is Ignored.Explicitly
+        ) or (
+            selected is Ignored.Implicitly and ignored is not Selected.Implicitly
+        ):
+            print("1"*10)
+>           decision = self.more_specific_decision_for(code)
+E           TypeError: <lambda>() takes 0 positional arguments but 1 was given
+
+flake8/style_guide.py:294: TypeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        options = argparse.Namespace(
+            select=[],
+            ignore=["E"],
+            extended_default_select=["X1"],
+            enable_extensions=[],
+            extend_ignore=[],
+            disable_noqa=False,
+        )
+    
+        decider = DecisionEngine(options)
+        decider.more_specific_decision_for = lambda: None
+    
+        try:
+            decider.make_decision("E")
+        except TypeError:
+>           assert False
+E           assert False
+
+../../test.py:23: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - assert False
+============================== 1 failed in 0.04s ===============================

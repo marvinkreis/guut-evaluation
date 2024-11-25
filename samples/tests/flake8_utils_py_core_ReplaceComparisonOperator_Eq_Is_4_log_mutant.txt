@@ -1,0 +1,125 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        utils.__dict__["_tokenize_files_to_codes_mapping"] = lambda x: [
+                utils._Token(utils._COLON, ""),
+                utils._Token(MockString(utils._FILE), "")
+        ]
+    
+        try:
+>           utils.parse_files_to_codes_mapping("   project/__init__.py:F401 setup.py:E121")
+
+../../test.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value_ = '   project/__init__.py:F401 setup.py:E121'
+
+    def parse_files_to_codes_mapping(value_):  # noqa: C901
+        # type: (Union[Sequence[str], str]) -> List[Tuple[str, List[str]]]
+        """Parse a files-to-codes mapping.
+    
+        A files-to-codes mapping a sequence of values specified as
+        `filenames list:codes list ...`.  Each of the lists may be separated by
+        either comma or whitespace tokens.
+    
+        :param value: String to be parsed and normalized.
+        :type value: str
+        """
+        if not isinstance(value_, string_types):
+            value = "\n".join(value_)
+        else:
+            value = value_
+    
+        ret = []  # type: List[Tuple[str, List[str]]]
+        if not value.strip():
+            return ret
+    
+        class State:
+            seen_sep = True
+            seen_colon = False
+            filenames = []  # type: List[str]
+            codes = []  # type: List[str]
+    
+        def _reset():  # type: () -> None
+            if State.codes:
+                for filename in State.filenames:
+                    ret.append((filename, State.codes))
+            State.seen_sep = True
+            State.seen_colon = False
+            State.filenames = []
+            State.codes = []
+    
+        def _unexpected_token():  # type: () -> exceptions.ExecutionError
+            def _indent(s):  # type: (str) -> str
+                return "    " + s.strip().replace("\n", "\n    ")
+    
+            return exceptions.ExecutionError(
+                "Expected `per-file-ignores` to be a mapping from file exclude "
+                "patterns to ignore codes.\n\n"
+                "Configured `per-file-ignores` setting:\n\n{}".format(
+                    _indent(value)
+                )
+            )
+    
+        for token in _tokenize_files_to_codes_mapping(value):
+            # legal in any state: separator sets the sep bit
+            if token.tp in {_COMMA, _WS}:
+                State.seen_sep = True
+            # looking for filenames
+            elif not State.seen_colon:
+                if token.tp == _COLON:
+                    State.seen_colon = True
+                    State.seen_sep = True
+                elif State.seen_sep and token.tp == _FILE:
+                    State.filenames.append(token.src)
+                    State.seen_sep = False
+                else:
+                    raise _unexpected_token()
+            # looking for codes
+            else:
+                if token.tp == _EOF:
+                    _reset()
+                elif State.seen_sep and token.tp == _CODE:
+                    State.codes.append(token.src)
+                    State.seen_sep = False
+                elif State.seen_sep and token.tp is _FILE:
+                    _reset()
+                    State.filenames.append(token.src)
+                    State.seen_sep = False
+                else:
+>                   raise _unexpected_token()
+E                   flake8.exceptions.ExecutionError: Expected `per-file-ignores` to be a mapping from file exclude patterns to ignore codes.
+E                   
+E                   Configured `per-file-ignores` setting:
+E                   
+E                       project/__init__.py:F401 setup.py:E121
+
+flake8/utils.py:153: ExecutionError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        utils.__dict__["_tokenize_files_to_codes_mapping"] = lambda x: [
+                utils._Token(utils._COLON, ""),
+                utils._Token(MockString(utils._FILE), "")
+        ]
+    
+        try:
+            utils.parse_files_to_codes_mapping("   project/__init__.py:F401 setup.py:E121")
+        except exceptions.ExecutionError:
+>           assert False
+E           assert False
+
+../../test.py:18: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - assert False
+============================== 1 failed in 0.04s ===============================

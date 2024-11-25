@@ -1,0 +1,45 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        output = StringIO()
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(logging.StreamHandler(output))
+    
+        with TemporaryDirectory() as tempdir:
+            (Path(tempdir) / "path").mkdir()
+            (Path(tempdir) / "path" / "sub1.pyi").write_text("__all__ = []; import missing;")
+            (Path(tempdir) / "path" / "sub2.pyi").write_text("__all__ = []; import missing;")
+            (Path(tempdir) / "path" / "sub3.pyi").write_text("__all__ = [];")
+            (Path(tempdir) / "main.py").write_text(f"__path__ = ['{tempdir}/path'];")
+    
+            sys.path.append(tempdir)
+    
+            try:
+                load_root("main", "main")
+            except ModuleNotFoundError:
+                pass
+    
+>           assert len([match for match in re.finditer("Load stub:", output.getvalue())]) == 3
+E           AssertionError: assert 4 == 3
+E            +  where 4 = len([<re.Match object; span=(39, 49), match='Load stub:'>, <re.Match object; span=(60, 70), match='Load stub:'>, <re.Match object; span=(81, 91), match='Load stub:'>, <re.Match object; span=(102, 112), match='Load stub:'>])
+
+../test.py:30: AssertionError
+------------------------------ Captured log call -------------------------------
+DEBUG    root:compiler.py:450 Module path: ['/tmp/tmpghvd1q7o/path']
+DEBUG    root:compiler.py:419 Load stub: main.sub3
+DEBUG    root:compiler.py:419 Load stub: main.sub2
+DEBUG    root:compiler.py:419 Load stub: main.sub1
+DEBUG    root:compiler.py:419 Load stub: main.sub2
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert 4 == 3
+============================== 1 failed in 0.03s ===============================

@@ -1,0 +1,76 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        argparser.__dict__["RequestItems"] = SimpleNamespace(
+                from_args=lambda request_item_args, as_form: SimpleNamespace(
+                    headers=[],
+                    data=[],
+                    files=MockDict(),
+                    params=[],
+                    multipart_data=[]
+        ))
+    
+        parser = argparser.HTTPieArgumentParser()
+        parser.args = SimpleNamespace(request_items=[], form=False)
+    
+        try:
+>           parser._parse_items()
+
+../test.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/cli/argparser.py:367: in _parse_items
+    fn, fd, ct = self.args.files['']
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = {}, key = ''
+
+    def __getitem__(self, key):
+        if key in self.data:
+            return self.data[key]
+        if hasattr(self.__class__, "__missing__"):
+            return self.__class__.__missing__(self, key)
+>       raise KeyError(key)
+E       KeyError: ''
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/collections/__init__.py:1010: KeyError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        argparser.__dict__["RequestItems"] = SimpleNamespace(
+                from_args=lambda request_item_args, as_form: SimpleNamespace(
+                    headers=[],
+                    data=[],
+                    files=MockDict(),
+                    params=[],
+                    multipart_data=[]
+        ))
+    
+        parser = argparser.HTTPieArgumentParser()
+        parser.args = SimpleNamespace(request_items=[], form=False)
+    
+        try:
+            parser._parse_items()
+        except KeyError:
+>           assert False
+E           assert False
+
+../test.py:27: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.41s =========================

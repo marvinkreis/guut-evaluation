@@ -1,0 +1,31 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py isid called
+F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+>       print(_validate_attr_identifier(MockIdentifier("asdf"), ""))
+
+../test.py:15: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+flutils/moduleutils.py:72: in _validate_attr_identifier
+    if is_valid == True and identifier in _DUNDERS:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test.MockBool object at 0x738c4a17c520>, other = True
+
+    def __eq__(self, other):
+>       assert False
+E       assert False
+
+../test.py:7: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.04s ===============================

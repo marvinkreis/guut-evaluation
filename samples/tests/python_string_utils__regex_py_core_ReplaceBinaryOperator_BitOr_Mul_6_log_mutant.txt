@@ -1,0 +1,25 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        out = StringIO()
+        err = StringIO()
+        with redirect_stdout(out):
+            from string_utils._regex import PRETTIFY_RE
+>       assert not out.getvalue()
+E       assert not "SUBPATTERN 1 0 0\n  LITERAL 60\n  BRANCH\n    MAX_REPEAT 0 1\n      SUBPATTERN 2 0 0\n        MAX_REPEAT 1 MAXREPEAT\...   ANY\n497.     SUCCESS\n498:   LITERAL 0x3e ('>')\n500.   JUMP 2 (to 503)\n502: FAILURE\n503: MARK 1\n505. SUCCESS\n"
+E        +  where "SUBPATTERN 1 0 0\n  LITERAL 60\n  BRANCH\n    MAX_REPEAT 0 1\n      SUBPATTERN 2 0 0\n        MAX_REPEAT 1 MAXREPEAT\...   ANY\n497.     SUCCESS\n498:   LITERAL 0x3e ('>')\n500.   JUMP 2 (to 503)\n502: FAILURE\n503: MARK 1\n505. SUCCESS\n" = <built-in method getvalue of _io.StringIO object at 0x78639bf4f310>()
+E        +    where <built-in method getvalue of _io.StringIO object at 0x78639bf4f310> = <_io.StringIO object at 0x78639bf4f310>.getvalue
+
+../test.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert not "SUBPATTERN 1 0 0\n  LITERAL 60\n  BRANC...
+============================== 1 failed in 0.05s ===============================

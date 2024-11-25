@@ -1,0 +1,34 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        options = argparse.Namespace(
+            select=SELECT,
+            ignore=IGNORE,
+            extended_default_select=["X1"],
+            enable_extensions=[],
+            extend_ignore=[],
+            disable_noqa=False,
+        )
+    
+        decider = DecisionEngine(options)
+        decider.was_selected = lambda x: EqToAll()
+    
+        try:
+            decision = decider.make_decision("X1")
+>           assert decision == Decision.Selected
+E           AssertionError: assert <Decision.Ignored: 'ignored error'> == <Decision.Selected: 'selected error'>
+E            +  where <Decision.Selected: 'selected error'> = Decision.Selected
+
+../../test.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - AssertionError: assert <Decision.Ignored: 'ignor...
+============================== 1 failed in 0.03s ===============================

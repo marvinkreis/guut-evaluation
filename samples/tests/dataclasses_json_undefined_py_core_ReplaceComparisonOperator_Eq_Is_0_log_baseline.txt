@@ -1,0 +1,15 @@
+Running test on baseline:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py .
+
+=============================== warnings summary ===============================
+../../../../home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247
+  /home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247: DeprecationWarning: invalid escape sequence \W
+    return re.sub("\W+", "", string)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 1 passed, 1 warning in 0.08s =========================

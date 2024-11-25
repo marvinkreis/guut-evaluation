@@ -1,0 +1,32 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        sys.modules["bpython"] = {}
+        color = _Color(3, True)
+>       print(color.wrap_text("test"))
+
+../test.py:9: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = [3mcolor[0m, text = 'test'
+
+    def wrap_text(self, text: str) -> str:
+        if not is_bpython():
+            return '\033[%s;%sm%s\033[0m' % (self.intensity, self.color_code, text)
+    
+>       colored_text = '\033[%sm%s\033[0m' >> (self.color_code, text)
+E       TypeError: unsupported operand type(s) for >>: 'str' and 'tuple'
+
+pdir/color.py:13: TypeError
+=========================== short test summary info ============================
+FAILED ../test.py::test - TypeError: unsupported operand type(s) for >>: 'str...
+============================== 1 failed in 0.03s ===============================

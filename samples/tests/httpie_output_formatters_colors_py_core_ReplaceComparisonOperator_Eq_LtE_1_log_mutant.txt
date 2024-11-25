@@ -1,0 +1,27 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        c = ColorFormatter(
+            Environment(colors=2),
+            True,
+            "aaaa",
+            format_options={}
+        )
+>       assert not isinstance(c.http_lexer, SimplifiedHTTPLexer)
+E       assert not True
+E        +  where True = isinstance(<pygments.lexers.SimplifiedHTTPLexer>, SimplifiedHTTPLexer)
+E        +    where <pygments.lexers.SimplifiedHTTPLexer> = <httpie.output.formatters.colors.ColorFormatter object at 0x713b32c7d340>.http_lexer
+
+../test.py:12: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert not True
+============================== 1 failed in 0.33s ===============================

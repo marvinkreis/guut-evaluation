@@ -1,0 +1,54 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        downloader = downloads.Downloader(output_file=SimpleNamespace(
+            seek=lambda x: None,
+            truncate=lambda: None,
+            name="name"
+        ), resume=False)
+    
+        downloads.__dict__["parse_content_range"] = lambda x, y: 1
+    
+        def mock_started(resumed_from, total_size):
+            assert resumed_from == 0
+            raise Exception()
+    
+        downloader.status.started = mock_started
+    
+        response = MagicMock(requests.Response)
+        response.headers = {"Content-Length": 1}
+    
+        try:
+>           downloader.start("", response)
+
+../test.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/downloads.py:277: in start
+    self.status.started(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+resumed_from = 1, total_size = 1
+
+    def mock_started(resumed_from, total_size):
+>       assert resumed_from == 0
+E       assert 1 == 0
+
+../test.py:18: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert 1 == 0
+========================= 1 failed, 1 warning in 0.42s =========================

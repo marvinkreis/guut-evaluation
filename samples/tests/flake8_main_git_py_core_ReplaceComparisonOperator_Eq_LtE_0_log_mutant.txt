@@ -1,0 +1,24 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        mock_process = SimpleNamespace(communicate=lambda: ("stdout", "stderr"), returncode=-1)
+        git.__dict__["piped_process"] = lambda x: mock_process
+    
+>       assert git.find_git_directory() is None
+E       AssertionError: assert 'stdout' is None
+E        +  where 'stdout' = <function find_git_directory at 0x7b9242198040>()
+E        +    where <function find_git_directory at 0x7b9242198040> = git.find_git_directory
+
+../../test.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - AssertionError: assert 'stdout' is None
+============================== 1 failed in 0.03s ===============================

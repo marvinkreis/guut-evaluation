@@ -1,0 +1,34 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        def mock_init():
+            assert False
+        sys.modules["colorama"] = SimpleNamespace(init=mock_init)
+        with patch("platform.system", return_value="Windows2"):
+>           import pdir.api
+
+../test.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+pdir/__init__.py:2: in <module>
+    from .api import PrettyDir
+pdir/api.py:25: in <module>
+    init()  # To support Windows.
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def mock_init():
+>       assert False
+E       assert False
+
+../test.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.04s ===============================

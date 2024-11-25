@@ -1,0 +1,154 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+mime = 'applicaschion/jschon', explicit_json = True, body = '}}'
+
+    def get_lexer(
+        mime: str,
+        explicit_json=False,
+        body=''
+    ) -> Optional[Type[Lexer]]:
+        # Build candidate mime type and lexer names.
+        mime_types, lexer_names = [mime], []
+        type_, subtype = mime.split('/', 1)
+        if '+' not in subtype:
+            lexer_names.append(subtype)
+        else:
+            subtype_name, subtype_suffix = subtype.split('+', 1)
+            lexer_names.extend([subtype_name, subtype_suffix])
+            mime_types.extend([
+                '%s/%s' % (type_, subtype_name),
+                '%s/%s' % (type_, subtype_suffix)
+            ])
+    
+        # As a last resort, if no lexer feels responsible, and
+        # the subtype contains 'json', take the JSON lexer
+        if 'json' in subtype:
+            lexer_names.append('json')
+    
+        # Try to resolve the right lexer.
+        lexer = None
+        for mime_type in mime_types:
+            try:
+                lexer = pygments.lexers.get_lexer_for_mimetype(mime_type)
+                break
+            except ClassNotFound:
+                pass
+        else:
+            for name in lexer_names:
+                try:
+                    lexer = pygments.lexers.get_lexer_by_name(name)
+                except ClassNotFound:
+                    pass
+    
+        if explicit_json and body and (not lexer or isinstance(lexer, TextLexer)):
+            # JSON response with an incorrect Content-Type?
+            try:
+>               json.loads(body)  # FIXME: the body also gets parsed in json.py
+
+httpie/output/formatters/colors.py:150: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/json/__init__.py:357: in loads
+    return _default_decoder.decode(s)
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x71005fe2c280>, s = '}}', idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/json/decoder.py:355: JSONDecodeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        try:
+>           get_lexer("applicaschion/jschon", True, "}}")
+
+../test.py:6: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+mime = 'applicaschion/jschon', explicit_json = True, body = '}}'
+
+    def get_lexer(
+        mime: str,
+        explicit_json=False,
+        body=''
+    ) -> Optional[Type[Lexer]]:
+        # Build candidate mime type and lexer names.
+        mime_types, lexer_names = [mime], []
+        type_, subtype = mime.split('/', 1)
+        if '+' not in subtype:
+            lexer_names.append(subtype)
+        else:
+            subtype_name, subtype_suffix = subtype.split('+', 1)
+            lexer_names.extend([subtype_name, subtype_suffix])
+            mime_types.extend([
+                '%s/%s' % (type_, subtype_name),
+                '%s/%s' % (type_, subtype_suffix)
+            ])
+    
+        # As a last resort, if no lexer feels responsible, and
+        # the subtype contains 'json', take the JSON lexer
+        if 'json' in subtype:
+            lexer_names.append('json')
+    
+        # Try to resolve the right lexer.
+        lexer = None
+        for mime_type in mime_types:
+            try:
+                lexer = pygments.lexers.get_lexer_for_mimetype(mime_type)
+                break
+            except ClassNotFound:
+                pass
+        else:
+            for name in lexer_names:
+                try:
+                    lexer = pygments.lexers.get_lexer_by_name(name)
+                except ClassNotFound:
+                    pass
+    
+        if explicit_json and body and (not lexer or isinstance(lexer, TextLexer)):
+            # JSON response with an incorrect Content-Type?
+            try:
+                json.loads(body)  # FIXME: the body also gets parsed in json.py
+>           except CosmicRayTestingException:
+E           NameError: name 'CosmicRayTestingException' is not defined
+
+httpie/output/formatters/colors.py:151: NameError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        try:
+            get_lexer("applicaschion/jschon", True, "}}")
+        except NameError:
+>           assert False
+E           assert False
+
+../test.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.32s ===============================

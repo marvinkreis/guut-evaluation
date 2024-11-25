@@ -1,0 +1,52 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        with patch("zlib.compress", wraps=compress) as c:
+            __StringCompressor.compress("abcd")
+>           c.assert_called_with(b"abcd", 9)
+
+../test.py:10: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <MagicMock name='compress' id='127659924639072'>, args = (b'abcd', 9)
+kwargs = {}, expected = ((b'abcd', 9), {}), actual = call(b'abcd', 8)
+_error_message = <function NonCallableMock.assert_called_with.<locals>._error_message at 0x741b246ccdc0>
+cause = None
+
+    def assert_called_with(self, /, *args, **kwargs):
+        """assert that the last call was made with the specified arguments.
+    
+        Raises an AssertionError if the args and keyword args passed in are
+        different to the last call to the mock."""
+        if self.call_args is None:
+            expected = self._format_mock_call_signature(args, kwargs)
+            actual = 'not called.'
+            error_message = ('expected call not found.\nExpected: %s\nActual: %s'
+                    % (expected, actual))
+            raise AssertionError(error_message)
+    
+        def _error_message():
+            msg = self._format_mock_failure_message(args, kwargs)
+            return msg
+        expected = self._call_matcher((args, kwargs))
+        actual = self._call_matcher(self.call_args)
+        if expected != actual:
+            cause = expected if isinstance(expected, Exception) else None
+>           raise AssertionError(_error_message()) from cause
+E           AssertionError: expected call not found.
+E           Expected: compress(b'abcd', 9)
+E           Actual: compress(b'abcd', 8)
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/unittest/mock.py:913: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: expected call not found.
+============================== 1 failed in 0.07s ===============================

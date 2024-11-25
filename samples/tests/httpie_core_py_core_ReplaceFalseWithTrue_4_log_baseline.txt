@@ -1,0 +1,20 @@
+Running test on baseline:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py Downloading 1.23 kB to "/tmp/tmpw84596fh/a"
+[K | 
+http: error: Incomplete download: size=1256; downloaded=0
+
+.
+
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 1 passed, 1 warning in 0.73s =========================
+[KDone. 0.00 B in 0.00024s (0.00 B/s)

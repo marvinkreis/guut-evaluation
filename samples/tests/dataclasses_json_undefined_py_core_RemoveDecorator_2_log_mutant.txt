@@ -1,0 +1,26 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+>       assert isinstance(_UndefinedParameterAction.__dict__["handle_to_dict"], staticmethod)
+E       assert False
+E        +  where False = isinstance(<function _UndefinedParameterAction.handle_to_dict at 0x75aace6c5160>, staticmethod)
+
+../test.py:4: AssertionError
+=============================== warnings summary ===============================
+../../../../home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247
+  /home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247: DeprecationWarning: invalid escape sequence \W
+    return re.sub("\W+", "", string)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.08s =========================

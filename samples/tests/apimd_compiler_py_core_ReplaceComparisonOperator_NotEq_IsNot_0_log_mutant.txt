@@ -1,0 +1,22 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        compiler.__dict__["get_name"] = mock_get_name
+        list(compiler.local_vars(compiler))
+>       assert not compiler.ALIAS
+E       AssertionError: assert not {'basename': 'basename', 'cache_orig_doc': 'cache_orig_doc', 'docstring': 'docstring', 'escape': 'escape', ...}
+E        +  where {'basename': 'basename', 'cache_orig_doc': 'cache_orig_doc', 'docstring': 'docstring', 'escape': 'escape', ...} = compiler.ALIAS
+
+../test.py:18: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert not {'basename': 'basename',...
+============================== 1 failed in 0.03s ===============================

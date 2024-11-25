@@ -1,0 +1,38 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        orig_isinstance = __builtins__["isinstance"]
+    
+        def mock_isinstance(obj, cls):
+            if orig_isinstance(obj, cls):
+                return True
+            return orig_isinstance(obj, MockInt)
+    
+        __builtins__["isinstance"] = mock_isinstance
+>       roman_range(2, 1, MockInt(1))
+
+../test.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+string_utils/generation.py:135: in roman_range
+    forward_exceed = step > -1 and (start > stop or start + step > stop)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = 1, other = -1
+
+    def __gt__(self, other):
+>       assert other != -1
+E       assert -1 != -1
+
+../test.py:6: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert -1 != -1
+============================== 1 failed in 0.05s ===============================

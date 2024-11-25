@@ -1,0 +1,82 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py Downloading 1.23 kB to "/tmp/tmp682p48ix/a"
+[K | F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        stderr = io.StringIO()
+        env = Environment()
+    
+        def mock_write_stream(stream, outfile, flush=False):
+            assert not flush
+    
+        writer.__dict__["write_stream"] = mock_write_stream
+        import httpie.core as core
+    
+        with TemporaryDirectory() as tempdir:
+            temp_path = Path(tempdir)
+>           core.program(SimpleNamespace(
+                download=True,
+                output_file=(temp_path / "a").open("w"),
+                output_file_specified=True,
+                download_resume=False,
+                headers={},
+                session="asdf",
+                session_read_only=True,
+                url="http://example.org",
+                files=[],
+                data=None,
+                json=None,
+                form=None,
+                offline=False,
+                multipart=False,
+                method="GET",
+                chunked=False,
+                auth=None,
+                params={},
+                timeout=None,
+                cert=None,
+                proxy=[],
+                verify="no",
+                ssl_version="tls1",
+                ciphers=[],
+                auth_plugin=None,
+                debug=False,
+                path_as_is=True,
+                compress=False,
+                output_options={},
+                max_headers=100,
+                check_status=False
+            ), env)
+
+../test.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/core.py:203: in program
+    write_stream(stream=download_stream, outfile=download_to, flush=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+stream = <httpie.output.streams.RawStream object at 0x79d2ea4557c0>
+outfile = <_io.TextIOWrapper name='/tmp/tmp682p48ix/a' mode='w' encoding='UTF-8'>
+flush = True
+
+    def mock_write_stream(stream, outfile, flush=False):
+>       assert not flush
+E       assert not True
+
+../test.py:17: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert not True
+========================= 1 failed, 1 warning in 0.80s =========================

@@ -1,0 +1,25 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        warnings.filterwarnings("error")
+    
+        # importing without __pycache__ present raises a SyntaxWarning
+>       from flake8.processor import FileProcessor
+E         File "/mnt/temp/inspect_mutant/flake8_mutant/src/flake8/processor.py", line 371
+E           elif (3, 0) <= sys.version_info is not (4, 0):
+E           ^
+E       SyntaxError: "is not" with a literal. Did you mean "!="?
+
+../../test.py:8: SyntaxError
+=========================== short test summary info ============================
+FAILED ../../test.py::test -   File "/mnt/temp/inspect_mutant/flake8_mutant/s...
+============================== 1 failed in 0.03s ===============================

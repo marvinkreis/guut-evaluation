@@ -1,0 +1,31 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        with patch("psutil.Process", return_value=MockProcess()):
+>           kill_proc_tree(9999, False)
+
+../test.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+flutes/multiproc.py:786: in kill_proc_tree
+    children = parent.children(recursive=False)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test.MockProcess object at 0x7438f863c8b0>, recursive = False
+
+    def children(self, recursive: bool):
+>       assert recursive
+E       assert False
+
+../test.py:7: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.12s ===============================

@@ -1,0 +1,39 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        sections = [
+            Section("Name1", "examples", SectionType.MULTIPLE),
+            Section("Name2", "examples", SectionType.MULTIPLE),
+            Section("....", "examples", SectionType.MULTIPLE)
+        ]
+        parser = GoogleParser(sections)
+        result = parser.parse(
+    """Example function.
+    
+    Name1:
+        param1: The first parameter.
+    
+    Fake:
+        param1: The first parameter.
+    
+    Name2:
+        param1: The first parameter.
+    """)
+>       assert len(result.meta) == 2
+E       assert 1 == 2
+E        +  where 1 = len([<docstring_parser.common.DocstringMeta object at 0x740b97945100>])
+E        +    where [<docstring_parser.common.DocstringMeta object at 0x740b97945100>] = <docstring_parser.common.Docstring object at 0x740b979450d0>.meta
+
+../test.py:23: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert 1 == 2
+============================== 1 failed in 0.04s ===============================

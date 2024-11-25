@@ -1,0 +1,46 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        warnings.filterwarnings("error")
+        # importing without __pycache__ present raises a SyntaxWarning
+        try:
+>           from flutes.fs import get_folder_size
+
+../test.py:8: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    from .__version__ import VERSION as __version__
+    
+    from .exception import *
+>   from .fs import *
+E     File "/mnt/temp/inspect_mutant/flutes_mutant/flutes/fs.py", line 23
+E       if platform.system() is "Darwin":
+E          ^
+E   SyntaxError: "is" with a literal. Did you mean "=="?
+
+flutes/__init__.py:4: SyntaxError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        warnings.filterwarnings("error")
+        # importing without __pycache__ present raises a SyntaxWarning
+        try:
+            from flutes.fs import get_folder_size
+        except SyntaxError:
+>           assert False
+E           assert False
+
+../test.py:10: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.04s ===============================

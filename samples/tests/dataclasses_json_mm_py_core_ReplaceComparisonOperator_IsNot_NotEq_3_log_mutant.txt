@@ -1,0 +1,31 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        schema = A.schema()
+>       assert schema.fields["value"].default is default_factory
+E       AssertionError: assert <marshmallow.missing> is <test.B object at 0x7664c7edc7c0>
+E        +  where <marshmallow.missing> = <fields.Integer(dump_default=<marshmallow.missing>, attribute=None, validate=None, required=False, load_only=False, du...be null.', 'validator_failed': 'Invalid value.', 'invalid': 'Not a valid integer.', 'too_large': 'Number too large.'})>.default
+
+../test.py:21: AssertionError
+=============================== warnings summary ===============================
+../../../../home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247
+  /home/marvin/workspace/guut-evaluation/emse_projects_data/venvs/dataclasses-json/lib/python3.8/site-packages/stringcase.py:247: DeprecationWarning: invalid escape sequence \W
+    return re.sub("\W+", "", string)
+
+test.py::test
+  /mnt/temp/inspect_mutant/test.py:21: RemovedInMarshmallow4Warning: The 'default' attribute of fields is deprecated. Use 'dump_default' instead.
+    assert schema.fields["value"].default is default_factory
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert <marshmallow.missing> is <te...
+======================== 1 failed, 2 warnings in 0.11s =========================

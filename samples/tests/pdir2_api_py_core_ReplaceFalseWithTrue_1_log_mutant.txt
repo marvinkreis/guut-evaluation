@@ -1,0 +1,35 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+>       pa = PrettyAttribute("name", (AttrCategory.SLOT,), A())
+
+../test.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+pdir/api.py:172: in __init__
+    self.doc = self.get_oneline_doc()
+pdir/api.py:212: in get_oneline_doc
+    doc = inspect.getdoc(attr)
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/inspect.py:613: in getdoc
+    doc = object.__doc__
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test.A object at 0x716efb3f1d00>
+
+    @property
+    def __doc__(self):
+>       raise Exception()
+E       Exception
+
+../test.py:9: Exception
+=========================== short test summary info ============================
+FAILED ../test.py::test - Exception
+============================== 1 failed in 0.07s ===============================

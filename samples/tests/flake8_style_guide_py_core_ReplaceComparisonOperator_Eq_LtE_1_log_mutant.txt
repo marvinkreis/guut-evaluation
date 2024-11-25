@@ -1,0 +1,30 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        options = argparse.Namespace(
+            select=[],
+            ignore=IGNORE,
+            extended_default_select=["X1"],
+            enable_extensions=[],
+            extend_ignore=[],
+            disable_noqa=False,
+        )
+    
+        decider = DecisionEngine(options)
+>       assert not decider.using_default_select
+E       assert not True
+E        +  where True = <flake8.style_guide.DecisionEngine object at 0x7002b58e3a90>.using_default_select
+
+../../test.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - assert not True
+============================== 1 failed in 0.03s ===============================

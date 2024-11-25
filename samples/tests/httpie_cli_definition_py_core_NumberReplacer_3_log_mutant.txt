@@ -1,0 +1,27 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        mutated_option = [a for a in output_processing._actions if "-s" in a.option_strings][0]
+>       assert "        coffee" in mutated_option.help
+E       assert '        coffee' in '\n    Output coloring style (default is "auto"). It can be One of:\n\n    abap, algol, algol_nu, arduino, auto, autum...riable is set to "xterm-256color" or similar\n    (e.g., via `export TERM=xterm-256color\' in your ~/.bashrc).\n\n    '
+E        +  where '\n    Output coloring style (default is "auto"). It can be One of:\n\n    abap, algol, algol_nu, arduino, auto, autum...riable is set to "xterm-256color" or similar\n    (e.g., via `export TERM=xterm-256color\' in your ~/.bashrc).\n\n    ' = _StoreAction(option_strings=['--style', '-s'], dest='style', nargs=None, const=None, default='auto', type=None, choice...xterm-256color" or similar\n    (e.g., via `export TERM=xterm-256color\' in your ~/.bashrc).\n\n    ', metavar='STYLE').help
+
+../test.py:5: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert '        coffee' in '\n    Output coloring s...
+========================= 1 failed, 1 warning in 0.44s =========================

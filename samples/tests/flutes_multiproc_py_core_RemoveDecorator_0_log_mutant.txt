@@ -1,0 +1,20 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+>       assert isinstance(DummyPool.__dict__["_no_op"], staticmethod)
+E       assert False
+E        +  where False = isinstance(<function DummyPool._no_op at 0x79b7a207ee50>, staticmethod)
+
+../test.py:5: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.08s ===============================

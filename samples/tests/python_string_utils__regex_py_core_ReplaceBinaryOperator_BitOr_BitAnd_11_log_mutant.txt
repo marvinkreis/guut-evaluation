@@ -1,0 +1,36 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        re.RegexFlag.__or__ = MockReFlag.__or__
+        re.RegexFlag.__and__ = MockReFlag.__and__
+>       from string_utils import _regex
+
+../test.py:20: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+string_utils/__init__.py:7: in <module>
+    from .validation import *
+string_utils/validation.py:35: in <module>
+    from ._regex import *
+string_utils/_regex.py:142: in <module>
+    re.MULTILINE & re.DOTALL
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = re.MULTILINE, other = re.DOTALL
+
+    def __and__(self, other):
+>       assert False
+E       assert False
+
+../test.py:14: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.05s ===============================

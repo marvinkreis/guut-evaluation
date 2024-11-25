@@ -1,0 +1,44 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        import errno
+        orig_errno = errno.EEXIST
+        errno.EEXIST = MockErrno()
+    
+        with TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "whatever"
+            bcd = BaseConfigDict(path)
+>           bcd.ensure_directory()
+
+../test.py:20: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/config.py:76: in ensure_directory
+    self.path.parent.mkdir(mode=0o700, parents=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/tmp/tmpay6o2s13'), mode = 448, parents = True
+exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        if self._closed:
+            self._raise_closed()
+        try:
+>           self._accessor.mkdir(self, mode)
+E           FileExistsError: [Errno 17] File exists: '/tmp/tmpay6o2s13'
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/pathlib.py:1288: FileExistsError
+=========================== short test summary info ============================
+FAILED ../test.py::test - FileExistsError: [Errno 17] File exists: '/tmp/tmpa...
+============================== 1 failed in 0.05s ===============================

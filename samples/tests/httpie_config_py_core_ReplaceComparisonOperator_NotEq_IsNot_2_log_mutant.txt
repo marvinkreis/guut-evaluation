@@ -1,0 +1,46 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        import errno
+        orig_errno = errno.ENOENT
+        errno.ENOENT = MockErrno()
+    
+        with TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "whatever"
+            bcd = BaseConfigDict(path)
+    
+            try:
+>               bcd.delete()
+
+../test.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/config.py:125: in delete
+    self.path.unlink()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/tmp/tmp_9mhy990/whatever'), missing_ok = False
+
+    def unlink(self, missing_ok=False):
+        """
+        Remove this file or link.
+        If the path is a directory, use rmdir() instead.
+        """
+        if self._closed:
+            self._raise_closed()
+        try:
+>           self._accessor.unlink(self)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmp_9mhy990/whatever'
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/pathlib.py:1325: FileNotFoundError
+=========================== short test summary info ============================
+FAILED ../test.py::test - FileNotFoundError: [Errno 2] No such file or direct...
+============================== 1 failed in 0.06s ===============================

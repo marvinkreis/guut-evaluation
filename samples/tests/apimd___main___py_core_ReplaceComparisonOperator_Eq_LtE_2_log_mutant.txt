@@ -1,0 +1,58 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py usage: apimd 1.2.1 [-h] [-v] [-d [DIR]] [--dry] module [module ...]
+apimd 1.2.1: error: unrecognized arguments: -s
+F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        loader = SourceFileLoader("AAAA", "apimd/__main__.py")
+>       module = loader.load_module()
+
+../test.py:6: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<frozen importlib._bootstrap_external>:522: in _check_name_wrapper
+    ???
+<frozen importlib._bootstrap_external>:1022: in load_module
+    ???
+<frozen importlib._bootstrap_external>:847: in load_module
+    ???
+<frozen importlib._bootstrap>:265: in _load_module_shim
+    ???
+<frozen importlib._bootstrap>:702: in _load
+    ???
+<frozen importlib._bootstrap>:671: in _load_unlocked
+    ???
+<frozen importlib._bootstrap_external>:843: in exec_module
+    ???
+<frozen importlib._bootstrap>:219: in _call_with_frames_removed
+    ???
+apimd/__main__.py:59: in <module>
+    main()
+apimd/__main__.py:45: in main
+    arg = parser.parse_args()
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/argparse.py:1771: in parse_args
+    self.error(msg % ' '.join(argv))
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/argparse.py:2521: in error
+    self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ArgumentParser(prog='apimd 1.2.1', usage=None, description='Compile Python public API into Generic Markdown.', formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)
+status = 2, message = 'apimd 1.2.1: error: unrecognized arguments: -s\n'
+
+    def exit(self, status=0, message=None):
+        if message:
+            self._print_message(message, _sys.stderr)
+>       _sys.exit(status)
+E       SystemExit: 2
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/argparse.py:2508: SystemExit
+=========================== short test summary info ============================
+FAILED ../test.py::test - SystemExit: 2
+============================== 1 failed in 0.09s ===============================

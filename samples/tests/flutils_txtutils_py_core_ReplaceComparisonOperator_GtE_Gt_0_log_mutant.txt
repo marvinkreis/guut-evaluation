@@ -1,0 +1,24 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        sys.hexversion = 0x03080000
+        import flutils.txtutils as txtutils
+>       assert txtutils.cached_property.__module__ == "functools"
+E       AssertionError: assert 'flutils.decorators' == 'functools'
+E         
+E         - functools
+E         + flutils.decorators
+
+../test.py:7: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert 'flutils.decorators' == 'fun...
+============================== 1 failed in 0.03s ===============================

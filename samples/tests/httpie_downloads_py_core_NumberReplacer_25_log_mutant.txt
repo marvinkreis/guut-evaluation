@@ -1,0 +1,55 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        downloads.__dict__["parse_content_range"] = lambda x, y: 1
+        def mock_raw_stream(msg, with_headers, with_body, on_body_chunk_downloaded, chunk_size):
+            assert chunk_size == 1024 * 8
+            raise Exception()
+        downloads.__dict__["RawStream"] = mock_raw_stream
+    
+        downloader = downloads.Downloader(output_file=SimpleNamespace(
+            seek=lambda x: None,
+            truncate=lambda: None,
+            name="name"
+        ), resume=False)
+    
+        response = MagicMock(requests.Response)
+        response.headers = {"Content-Length": 1}
+    
+        try:
+>           downloader.start("", response)
+
+../test.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+httpie/downloads.py:282: in start
+    stream = RawStream(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+msg = <httpie.models.HTTPResponse object at 0x743b1b09fdc0>
+with_headers = False, with_body = True
+on_body_chunk_downloaded = <bound method Downloader.chunk_downloaded of <httpie.downloads.Downloader object at 0x743b1b0a52b0>>
+chunk_size = 8184
+
+    def mock_raw_stream(msg, with_headers, with_body, on_body_chunk_downloaded, chunk_size):
+>       assert chunk_size == 1024 * 8
+E       assert 8184 == (1024 * 8)
+
+../test.py:11: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert 8184 == (1024 * 8)
+========================= 1 failed, 1 warning in 0.45s =========================

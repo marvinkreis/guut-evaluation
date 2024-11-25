@@ -1,0 +1,34 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        orig_add = re.RegexFlag.__add__
+        def mock_add(self, other):
+            assert False
+        re.RegexFlag.__add__ = mock_add
+>       parse("text")
+
+../test.py:10: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+docstring_parser/rest.py:113: in parse
+    r"(^:.*?)(?=^:|\Z)", meta_chunk, flags=re.S + re.M
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = re.DOTALL, other = re.MULTILINE
+
+    def mock_add(self, other):
+>       assert False
+E       assert False
+
+../test.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.03s ===============================

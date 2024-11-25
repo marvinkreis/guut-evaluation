@@ -1,0 +1,55 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        warnings.filterwarnings("error")
+        try:
+>           from pdir.color import _Color
+
+../test.py:7: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+pdir/__init__.py:2: in <module>
+    from .api import PrettyDir
+pdir/api.py:20: in <module>
+    from . import format
+pdir/format.py:8: in <module>
+    from .configuration import attribute_color, category_color, comma, slot_tag, doc_color
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    """Configuration management setup
+    """
+    
+    import os
+    from configparser import ConfigParser
+    from os.path import expanduser
+    
+>   from .color import COLORS
+E     File "/mnt/temp/inspect_mutant/pdir2_mutant/pdir/color.py", line 14
+E       if self.intensity is '0':
+E          ^
+E   SyntaxError: "is" with a literal. Did you mean "=="?
+
+pdir/configuration.py:8: SyntaxError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        warnings.filterwarnings("error")
+        try:
+            from pdir.color import _Color
+        except SyntaxError:
+>           assert False
+E           assert False
+
+../test.py:9: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.04s ===============================

@@ -1,0 +1,26 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        p = FileProcessor("filename.py", options_from(), lines=["import sys\n"] * 10)
+        p._file_tokens = [
+                (tokenize.ENDMARKER, None, (2, None), (2, None), None),
+                (tokenize.NL, None, (2, None), (2, None), None),
+        ]
+        p.noqa_line_for(0)
+>       assert not p._noqa_line_mapping
+E       AssertionError: assert not {2: 'import sys\n'}
+E        +  where {2: 'import sys\n'} = <flake8.processor.FileProcessor object at 0x7c4f7155b850>._noqa_line_mapping
+
+../../test.py:25: AssertionError
+=========================== short test summary info ============================
+FAILED ../../test.py::test - AssertionError: assert not {2: 'import sys\n'}
+============================== 1 failed in 0.04s ===============================

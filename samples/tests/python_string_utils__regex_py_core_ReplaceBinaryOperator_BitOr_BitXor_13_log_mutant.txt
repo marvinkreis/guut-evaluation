@@ -1,0 +1,37 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        re.RegexFlag.__or__ = MockReFlag.__or__
+        re.RegexFlag.__and__ = MockReFlag.__and__
+        re.RegexFlag.__xor__ = MockReFlag.__xor__
+>       from string_utils import _regex
+
+../test.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+string_utils/__init__.py:7: in <module>
+    from .validation import *
+string_utils/validation.py:35: in <module>
+    from ._regex import *
+string_utils/_regex.py:153: in <module>
+    NO_LETTERS_OR_NUMBERS_RE = re.compile(r'[^\w\d]+|_+', re.IGNORECASE ^ re.UNICODE)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = re.IGNORECASE, other = re.UNICODE
+
+    def __xor__(self, other):
+>       assert False
+E       assert False
+
+../test.py:16: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.05s ===============================

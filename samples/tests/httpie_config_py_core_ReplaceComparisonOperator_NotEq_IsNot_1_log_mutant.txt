@@ -1,0 +1,92 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+self = {}
+
+    def load(self):
+        config_type = type(self).__name__.lower()
+        try:
+>           with self.path.open('rt') as f:
+
+httpie/config.py:87: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/pathlib.py:1222: in open
+    return io.open(self, mode, buffering, encoding, errors, newline,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/tmp/tmpkmh40shd/whatever')
+name = '/tmp/tmpkmh40shd/whatever', flags = 524288, mode = 438
+
+    def _opener(self, name, flags, mode=0o666):
+        # A stub for the opener argument to built-in open()
+>       return self._accessor.open(self, flags, mode)
+E       FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmpkmh40shd/whatever'
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/pathlib.py:1078: FileNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        import errno
+        orig_errno = errno.ENOENT
+        errno.ENOENT = MockErrno()
+    
+        with TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "whatever"
+            bcd = BaseConfigDict(path)
+    
+            try:
+>               bcd.load()
+
+../test.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = {}
+
+    def load(self):
+        config_type = type(self).__name__.lower()
+        try:
+            with self.path.open('rt') as f:
+                try:
+                    data = json.load(f)
+                except ValueError as e:
+                    raise ConfigFileError(
+                        f'invalid {config_type} file: {e} [{self.path}]'
+                    )
+                self.update(data)
+        except IOError as e:
+            if e.errno is not errno.ENOENT:
+>               raise ConfigFileError(f'cannot read {config_type} file: {e}')
+E               httpie.config.ConfigFileError: cannot read baseconfigdict file: [Errno 2] No such file or directory: '/tmp/tmpkmh40shd/whatever'
+
+httpie/config.py:97: ConfigFileError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        import errno
+        orig_errno = errno.ENOENT
+        errno.ENOENT = MockErrno()
+    
+        with TemporaryDirectory() as tempdir:
+            path = Path(tempdir) / "whatever"
+            bcd = BaseConfigDict(path)
+    
+            try:
+                bcd.load()
+            except ConfigFileError:
+>               assert False
+E               assert False
+
+../test.py:24: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.07s ===============================

@@ -1,0 +1,33 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        with patch("inspect.getdoc", return_value=MockString("xxx")):
+>           pa = PrettyAttribute("name", (AttrCategory.DESCRIPTOR,), MockString)
+
+../test.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+pdir/api.py:172: in __init__
+    self.doc = self.get_oneline_doc()
+pdir/api.py:203: in get_oneline_doc
+    doc_list.append(doc.split('\n', 2)[0])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = 'xxx', sep = '\n', num = 2
+
+    def split(self, sep, num):
+>       assert num == 1
+E       assert 2 == 1
+
+../test.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert 2 == 1
+============================== 1 failed in 0.04s ===============================

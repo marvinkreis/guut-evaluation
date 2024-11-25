@@ -1,0 +1,90 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        with TemporaryDirectory() as tempdir:
+            (Path(tempdir) / "path").mkdir()
+            (Path(tempdir) / "path" / "sub1.pyi").write_text("__all__ = []; import sys; sys.modules['goal'] = []")
+            (Path(tempdir) / "path" / "sub2.pyi").write_text("__all__ = []; import goal")
+            (Path(tempdir) / "path" / "sub3.pyi").write_text("__all__ = []; import goal")
+            (Path(tempdir) / "main.py").write_text(f"__path__ = ['{tempdir}/path'];")
+    
+            sys.path.append(tempdir)
+    
+            try:
+>               load_root("main", "main")
+
+../test.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+apimd/compiler.py:463: in load_root
+    load_stubs(m)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+m = <module 'main' from '/tmp/tmp7r5mkukn/main.py'>
+
+    def load_stubs(m: ModuleType) -> None:
+        """Load all pyi files."""
+        if not hasattr(m, '__path__'):
+            return
+        m = cast(PathModule, m)
+        root = m.__path__[0]
+        if root in LOADED_PATH:
+            return
+        LOADED_PATH.add(root)
+        modules = {}
+        for file in listdir(root):
+            if not file.endswith('.pyi'):
+                continue
+            with open(join(root, file), 'r', encoding='utf-8') as f:
+                code = f.read()
+            modules[get_name(m) + '.' + file[:-len('.pyi')]] = code
+        module_names = list(modules)
+        counter = 0
+        while counter < len(module_names):
+            name = module_names.pop()
+            logger.debug(f"Load stub: {name}")
+            code = modules[name]
+            mod = ModuleType(name)
+            if not load_file(code, mod):
+                module_names.insert(0, name)
+                counter += 2
+            else:
+                counter = 0
+            if not module_names:
+                break
+        else:
+>           raise ModuleNotFoundError("unsolved module dependencies")
+E           ModuleNotFoundError: unsolved module dependencies
+
+apimd/compiler.py:430: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        with TemporaryDirectory() as tempdir:
+            (Path(tempdir) / "path").mkdir()
+            (Path(tempdir) / "path" / "sub1.pyi").write_text("__all__ = []; import sys; sys.modules['goal'] = []")
+            (Path(tempdir) / "path" / "sub2.pyi").write_text("__all__ = []; import goal")
+            (Path(tempdir) / "path" / "sub3.pyi").write_text("__all__ = []; import goal")
+            (Path(tempdir) / "main.py").write_text(f"__path__ = ['{tempdir}/path'];")
+    
+            sys.path.append(tempdir)
+    
+            try:
+                load_root("main", "main")
+            except ModuleNotFoundError:
+>               assert False
+E               assert False
+
+../test.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.05s ===============================

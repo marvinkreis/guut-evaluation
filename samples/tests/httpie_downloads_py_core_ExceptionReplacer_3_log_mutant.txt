@@ -1,0 +1,116 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+self = <httpie.downloads.Downloader object at 0x7a0abfa98b50>, initial_url = ''
+final_response = <MagicMock spec='Response' id='134186579550512'>
+
+    def start(
+        self,
+        initial_url: str,
+        final_response: requests.Response
+    ) -> Tuple[RawStream, IO]:
+        """
+        Initiate and return a stream for `response` body  with progress
+        callback attached. Can be called only once.
+    
+        :param initial_url: The original requested URL
+        :param final_response: Initiated response object with headers already fetched
+    
+        :return: RawStream, output_file
+    
+        """
+        assert not self.status.time_started
+    
+        # FIXME: some servers still might sent Content-Encoding: gzip
+        # <https://github.com/httpie/httpie/issues/423>
+        try:
+>           total_size = int(final_response.headers['Content-Length'])
+
+httpie/downloads.py:252: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <MagicMock spec='Response' id='134186579550512'>, name = 'headers'
+
+    def __getattr__(self, name):
+        if name in {'_mock_methods', '_mock_unsafe'}:
+            raise AttributeError(name)
+        elif self._mock_methods is not None:
+            if name not in self._mock_methods or name in _all_magics:
+>               raise AttributeError("Mock object has no attribute %r" % name)
+E               AttributeError: Mock object has no attribute 'headers'
+
+/home/marvin/.local/share/uv/python/cpython-3.8.19-linux-x86_64-gnu/lib/python3.8/unittest/mock.py:637: AttributeError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        downloader = Downloader()
+        response = MagicMock(requests.Response)
+    
+        try:
+>           downloader.start("", response)
+
+../test.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <httpie.downloads.Downloader object at 0x7a0abfa98b50>, initial_url = ''
+final_response = <MagicMock spec='Response' id='134186579550512'>
+
+    def start(
+        self,
+        initial_url: str,
+        final_response: requests.Response
+    ) -> Tuple[RawStream, IO]:
+        """
+        Initiate and return a stream for `response` body  with progress
+        callback attached. Can be called only once.
+    
+        :param initial_url: The original requested URL
+        :param final_response: Initiated response object with headers already fetched
+    
+        :return: RawStream, output_file
+    
+        """
+        assert not self.status.time_started
+    
+        # FIXME: some servers still might sent Content-Encoding: gzip
+        # <https://github.com/httpie/httpie/issues/423>
+        try:
+            total_size = int(final_response.headers['Content-Length'])
+>       except (KeyError, CosmicRayTestingException, TypeError):
+E       NameError: name 'CosmicRayTestingException' is not defined
+
+httpie/downloads.py:253: NameError
+
+During handling of the above exception, another exception occurred:
+
+    def test():
+        downloader = Downloader()
+        response = MagicMock(requests.Response)
+    
+        try:
+            downloader.start("", response)
+        except AttributeError:
+            pass
+        except NameError:
+>           assert False
+E           assert False
+
+../test.py:15: AssertionError
+=============================== warnings summary ===============================
+httpie/plugins/manager.py:5
+  /mnt/temp/inspect_mutant/httpie_mutant/httpie/plugins/manager.py:5: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    from pkg_resources import iter_entry_points
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+========================= 1 failed, 1 warning in 0.52s =========================

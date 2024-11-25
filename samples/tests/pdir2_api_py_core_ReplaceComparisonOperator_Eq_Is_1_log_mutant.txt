@@ -1,0 +1,21 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        try:
+            pa = PrettyAttribute("name", (int(AttrCategory.DESCRIPTOR),), AttrCategory)
+>           assert False
+E           assert False
+
+../test.py:9: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - assert False
+============================== 1 failed in 0.03s ===============================
