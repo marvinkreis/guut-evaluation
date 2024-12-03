@@ -2,24 +2,25 @@
 
 import json
 import os
+import re
 import sqlite3
+import math
 from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast
-from matplotlib import colormaps as cm
-from tqdm import tqdm
-from math import floor
 
 import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
+from matplotlib import colormaps as cm
+from tqdm import tqdm
 
 pd.set_option("display.width", None)
 pd.set_option("display.max_colwidth", None)
-pd.set_option("display.float_format", lambda x: f"{int(x):d}" if floor(x) == x else f"{x:.3f}")
-pd.DataFrame.__str__ = pd.DataFrame.to_string
-pd.DataFrame.__repr__ = pd.DataFrame.to_string
+pd.set_option("display.float_format", lambda x: f"{int(x):d}" if math.floor(x) == x else f"{x:.3f}")
+# pd.DataFrame.__str__ = pd.DataFrame.to_string
+# pd.DataFrame.__repr__ = pd.DataFrame.to_string
 
 JsonObj = Dict[str, Any]
 OUTPUT_PATH = Path("/tmp/out")
@@ -115,13 +116,6 @@ with Pool(8) as pool:
 data = pd.json_normalize(results_json)
 data = data.sort_values(by=["long_id", "problem.target_path", "problem.mutant_op", "problem.occurrence"])
 del results_json
-
-
-# %% Print memory usage
-
-with open("/proc/self/status") as f:
-    memusage = f.read().split("VmRSS:")[1].split("\n")[0][:-3]
-    print(f"Memory used: {int(memusage.strip()) / (1024**2):.3f} GB")
 
 
 # %% Add project name to data
@@ -275,9 +269,9 @@ for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
     cosmic_ray_results[(project, preset, "exitfirst")] = read_mutant_results(
         results_dir / "cosmic-ray" / "mutants.sqlite", project
     )
-#     cosmic_ray_results[(project, preset, "full")] = read_mutant_results(
-#         results_dir / "cosmic-ray-full" / "mutants.sqlite", project
-#     )
+    cosmic_ray_results[(project, preset, "full")] = read_mutant_results(
+        results_dir / "cosmic-ray-full" / "mutants.sqlite", project
+    )
 
 
 data["cosmic_ray.killed_by_own"] = data.apply(
@@ -296,21 +290,21 @@ data["cosmic_ray.output"] = data.apply(
     axis=1,
 )
 
-# data["cosmic_ray_full.killed_by_own"] = data.apply(
-#     lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].killed,
-#     axis=1,
-# )
-# presets = list(data["preset"].unique())
-# data["cosmic_ray_full.killed_by_any"] = data.apply(
-#     lambda row: any(
-#         cosmic_ray_results[(row["project"], preset, "full")][mutant_id_from_row(row)].killed for preset in presets
-#     ),
-#     axis=1,
-# )
-# data["cosmic_ray_full.output"] = data.apply(
-#     lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].output,
-#     axis=1,
-# )
+data["cosmic_ray_full.killed_by_own"] = data.apply(
+    lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].killed,
+    axis=1,
+)
+presets = list(data["preset"].unique())
+data["cosmic_ray_full.killed_by_any"] = data.apply(
+    lambda row: any(
+        cosmic_ray_results[(row["project"], preset, "full")][mutant_id_from_row(row)].killed for preset in presets
+    ),
+    axis=1,
+)
+data["cosmic_ray_full.output"] = data.apply(
+    lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].output,
+    axis=1,
+)
 
 del cosmic_ray_results
 
@@ -748,6 +742,14 @@ def has_output_difference(row):
 
 data["exit_code_diff"] = data.apply(lambda row: has_exit_code_difference(row), axis=1)
 data["output_diff"] = data.apply(lambda row: has_output_difference(row), axis=1)
+
+
+# %% Print memory usage
+
+with open("/proc/self/status") as f:
+    memusage = f.read().split("VmRSS:")[1].split("\n")[0][:-3]
+    print(f"Memory used: {int(memusage.strip()) / (1024**2):.3f} GB")
+
 
 # %% Print available columns
 
@@ -1343,9 +1345,39 @@ del mutant_data
 
 # %%
 
-data["cosmic_ray.output"].map(len).median()
+data[data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].apply(
+    lambda row: (row["preset"], row["mutant_id"].project), axis=1
+).unique()
+# data[["mutant_id"]][data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]]
+# (data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]).value_counts()
+
+# %%
+
+print(len(data[data["cosmic_ray.killed_by_own"]]))
+print(len(data[data["pynguin.cosmic_ray.killed_by_any"]]))
+
+# %%
+
+x = data["cosmic_ray_full.output"][4]
+failed_test_regex = re.compile(r"TEST FAILED: \[([^\]]+)\]")
+for match in re.finditer(failed_test_regex, x):
+    print(match.group(1))
+
+# %%
+
+sample_data = pd.read_csv(REPO_PATH / "samples" / "sampled_mutants.csv")
+sample_data["equivalent"].sum()
+
+
+def count_claims(row):
+    for i in range(3):
+        claim = row[f"claim{i+1}"]
+        if isinstance(claim, float):
+            return i
+    return 3
 
 
 # %%
 
-print(aggregated_pynguin_data)
+sample_data["num_claims"] = sample_data.apply(count_claims, axis=1)
+sample_data.groupby("num_claims").mean("equivalent")
