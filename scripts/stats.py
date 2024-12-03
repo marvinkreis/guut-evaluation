@@ -15,9 +15,11 @@ import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
 
-pd.set_option("display.width", 200)
+pd.set_option("display.width", None)
 pd.set_option("display.max_colwidth", None)
 pd.set_option("display.float_format", lambda x: f"{int(x):d}" if floor(x) == x else f"{x:.3f}")
+pd.DataFrame.__str__ = pd.DataFrame.to_string
+pd.DataFrame.__repr__ = pd.DataFrame.to_string
 
 JsonObj = Dict[str, Any]
 OUTPUT_PATH = Path("/tmp/out")
@@ -28,12 +30,14 @@ OUTPUT_PATH.mkdir(exist_ok=True)
 
 if "get_ipython" in locals():
     print("Running as ipython kernel")
-    RESULTS_DIR = Path(os.getcwd()).parent / "guut_emse_results"
-    MUTANTS_DIR = Path(os.getcwd()).parent / "emse_projects_data" / "mutants_sampled"
+    REPO_PATH = Path(os.getcwd()).parent
 else:
+    REPO_PATH = Path(__file__).parent
     print("Running as script")
-    RESULTS_DIR = Path(__file__).parent / "guut_emse_results"
-    MUTANTS_DIR = Path(__file__).parent / "emse_projects_data" / "mutants_sampled"
+
+RESULTS_DIR = REPO_PATH / "guut_emse_results"
+PYNGUIN_TESTS_DIR = REPO_PATH / "pynguin_emse_tests"
+MUTANTS_DIR = REPO_PATH / "emse_projects_data" / "mutants_sampled"
 
 
 # %% Load json result files
@@ -231,51 +235,176 @@ del mutant_lines
 # %% Add cosmic-ray results
 
 
+class CosmicRayInfo(NamedTuple):
+    killed: bool
+    output: str
+
+
 def test_outcome_kills(cosmic_ray_outcome):
     if cosmic_ray_outcome not in ["SURVIVED", "KILLED"]:
         raise Exception(f"Unexpected test outcome: {cosmic_ray_outcome}")
     return cosmic_ray_outcome == "KILLED"
 
 
-def read_mutant_results(mutants_file: Path, project: str) -> Dict[MutantId, str]:
+def read_mutant_results(mutants_file: Path, project: str) -> Dict[MutantId, CosmicRayInfo]:
     con = sqlite3.connect(mutants_file)
     cur = con.execute("""
         select
             module_path,
             operator_name,
             occurrence,
-            test_outcome
+            test_outcome,
+            output
         from mutation_specs
         left join work_results
             on mutation_specs.job_id = work_results.job_id;
     """)
     mutants = cur.fetchall()
     con.close()
-    return {MutantId(project, m[0], m[1], m[2]): test_outcome_kills(m[3]) for m in mutants}
+    return {MutantId(project, m[0], m[1], m[2]): CosmicRayInfo(test_outcome_kills(m[3]), m[4]) for m in mutants}
 
 
 cosmic_ray_results = {}
 # Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
-for mutants_path in RESULTS_DIR.glob("*/cosmic-ray/mutants.sqlite"):
+for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
     results_dir = (mutants_path / ".." / "..").resolve()
     parts = results_dir.name.split("_")
     preset = "_".join(parts[:3])
     package = "_".join(parts[3:-1])
     project = package_to_project[package]
-    cosmic_ray_results[(project, preset)] = read_mutant_results(mutants_path, project)
+    cosmic_ray_results[(project, preset, "exitfirst")] = read_mutant_results(
+        results_dir / "cosmic-ray" / "mutants.sqlite", project
+    )
+#     cosmic_ray_results[(project, preset, "full")] = read_mutant_results(
+#         results_dir / "cosmic-ray-full" / "mutants.sqlite", project
+#     )
 
 
 data["cosmic_ray.killed_by_own"] = data.apply(
-    lambda row: cosmic_ray_results[(row["project"], row["preset"])][mutant_id_from_row(row)],
+    lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][mutant_id_from_row(row)].killed,
     axis=1,
 )
 presets = list(data["preset"].unique())
 data["cosmic_ray.killed_by_any"] = data.apply(
-    lambda row: any(cosmic_ray_results[(row["project"], preset)][mutant_id_from_row(row)] for preset in presets),
+    lambda row: any(
+        cosmic_ray_results[(row["project"], preset, "exitfirst")][mutant_id_from_row(row)].killed for preset in presets
+    ),
+    axis=1,
+)
+data["cosmic_ray.output"] = data.apply(
+    lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][mutant_id_from_row(row)].output,
     axis=1,
 )
 
+# data["cosmic_ray_full.killed_by_own"] = data.apply(
+#     lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].killed,
+#     axis=1,
+# )
+# presets = list(data["preset"].unique())
+# data["cosmic_ray_full.killed_by_any"] = data.apply(
+#     lambda row: any(
+#         cosmic_ray_results[(row["project"], preset, "full")][mutant_id_from_row(row)].killed for preset in presets
+#     ),
+#     axis=1,
+# )
+# data["cosmic_ray_full.output"] = data.apply(
+#     lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].output,
+#     axis=1,
+# )
+
 del cosmic_ray_results
+
+
+# %% Read Pynguin cosmic-ray results
+
+
+pynguin_data = dict(project=[], index=[], mutant_id=[], killed=[], output=[])
+# Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
+for mutants_path in PYNGUIN_TESTS_DIR.glob("*/*/cosmic-ray/mutants.sqlite"):
+    project = mutants_path.parent.parent.parent.name
+    index = mutants_path.parent.parent.name
+    if (project, index) in [("flutils", "06"), ("flutils", "09"), ("flake8", "04")]:
+        "skip for now, due to errors"
+        continue
+    results = read_mutant_results(mutants_path, project)
+    for mutant_id, cosmic_ray_info in results.items():
+        pynguin_data["project"].append(project)
+        pynguin_data["index"].append(int(index))
+        pynguin_data["mutant_id"].append(mutant_id)
+        pynguin_data["killed"].append(cosmic_ray_info.killed)
+        pynguin_data["output"].append(cosmic_ray_info.output)
+pynguin_data = pd.DataFrame(pynguin_data)
+
+
+# %% Sum up Pynguin results
+
+Project = str
+
+
+class PynguinCosmicRayRunSummary(NamedTuple):
+    index_: int
+    kills: int
+
+
+best_pynguin_runs: Dict[Project, PynguinCosmicRayRunSummary] = {}
+aggregated_pynguin_data = dict(project=[], index=[], killed=[])
+for project in pynguin_data["project"].unique():
+    for index in range(30):
+        index += 1
+        if (project, index) in [("flutils", "06"), ("flutils", "09"), ("flake8", "04")]:
+            "skip for now, due to errors"
+            continue
+        target_data = (
+            pynguin_data
+            # filter by project
+            .loc[lambda df: df["project"] == project]
+            # filter by index
+            .loc[lambda df: df["index"] == index]
+        )
+
+        num_kills = target_data["killed"].sum()
+        aggregated_pynguin_data["project"].append(project)
+        aggregated_pynguin_data["index"].append(index)
+        aggregated_pynguin_data["killed"].append(num_kills)
+        max_index, max_kills = best_pynguin_runs.get(project, (-1, -1))
+        if num_kills > max_kills:
+            best_pynguin_runs[project] = PynguinCosmicRayRunSummary(index, num_kills)
+aggregated_pynguin_data = pd.DataFrame(aggregated_pynguin_data)
+
+
+# %% Check which mutants are killed by pynguin runs
+
+
+class PynguinCosmicRayMutantStatus(NamedTuple):
+    killed_by_best: bool
+    killed_by_any: bool
+
+
+pynguin_mutant_statuses: Dict[MutantId, PynguinCosmicRayMutantStatus] = {}
+for index, row in pynguin_data.iterrows():
+    project = cast(str, row["project"])
+    index = row["index"]
+    mutant_id = cast(MutantId, row["mutant_id"])
+    killed = cast(bool, row["killed"])
+
+    is_best_run = best_pynguin_runs[project].index_ == index
+
+    current_status = pynguin_mutant_statuses.get(mutant_id, PynguinCosmicRayMutantStatus(False, False))
+    killed_by_best = current_status.killed_by_best or (is_best_run and killed)
+    killed_by_any = current_status.killed_by_any or killed
+
+    pynguin_mutant_statuses[mutant_id] = PynguinCosmicRayMutantStatus(killed_by_best, killed_by_any)
+
+data["pynguin.cosmic_ray.killed_by_best"] = data.apply(
+    lambda row: pynguin_mutant_statuses.get(
+        row["mutant_id"], PynguinCosmicRayMutantStatus(False, False)
+    ).killed_by_best,
+    axis=1,
+)
+data["pynguin.cosmic_ray.killed_by_any"] = data.apply(
+    lambda row: pynguin_mutant_statuses.get(row["mutant_id"], PynguinCosmicRayMutantStatus(False, False)).killed_by_any,
+    axis=1,
+)
 
 
 # %% Check which mutants are claimed equivalent by multiple runs and what runs they are claimed by
@@ -1210,3 +1339,13 @@ for num_claims in [0, 1, 2, 3]:
     print(f"{percentage * 100:5.2f}% of mutants with {num_claims} claims weren't killed by any test")
 
 del mutant_data
+
+
+# %%
+
+data["cosmic_ray.output"].map(len).median()
+
+
+# %%
+
+print(aggregated_pynguin_data)
