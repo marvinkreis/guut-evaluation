@@ -18,8 +18,7 @@ while (( $# > 2)); do
     if [[ "$3" == "--continue" ]]; then
         continue=1
         shift
-    fi
-    if [[ "$3" == "-x" ]]; then
+    elif [[ "$3" == "-x" ]]; then
         stop_after_first_fail="-x"
         shift
     fi

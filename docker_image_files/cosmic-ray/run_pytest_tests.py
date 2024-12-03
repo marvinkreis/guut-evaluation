@@ -50,6 +50,8 @@ def create_mock_io():
 
 def patch_test_file(test_path: Path, test_name: str):
     test_src = Path(test_path).read_text()
+    if "import pytest" not in test_src:
+        test_src = f"import pytest\n{test_src}"
     test_src = test_src.replace(f"def {test_name}", f'@pytest.mark.skip(reason="failed_in_baseline")\ndef {test_name}')
     Path(test_path).write_text(test_src)
 
