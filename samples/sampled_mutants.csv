@@ -61,7 +61,7 @@
 21955,flake8,checker.py,core/NumberReplacer,1,3276556,f20f8915,,1,0,1,1,Changes integer values in a tuple.,Mocking the Python version.,Mutant replaces a number in a python version comparison.
 14449,flake8,checker.py,core/ReplaceComparisonOperator_Eq_Is,2,61d418dd,,,0,0,1,1,"Turns ""=="" comparison to ""is"" with a string literal.",SyntaxWarning when no __pycache__ is present.,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
 24727,flake8,checker.py,core/ReplaceComparisonOperator_Eq_LtE,3,,,,0,0,0,1,,,
-22057,flake8,checker.py,core/ReplaceFalseWithTrue,1,,,,0,0,1,0,,,
+22057,flake8,checker.py,core/ReplaceFalseWithTrue,1,,,,0,0,1,1,,,
 22250,flake8,main/git.py,core/ReplaceComparisonOperator_Eq_LtE,0,,,,0,0,0,1,"Turns ""== 0"" comparison to ""<= 0"" when operand cannot be negative.",Mocking functions from the package.,"Mutant replaces ""returncode == 0"" with ""returncode <= 0""."
 23198,flake8,plugins/pyflakes.py,core/AddNot,1,ab780bc4,,,0,0,0,1,,,
 21882,flake8,plugins/pyflakes.py,core/ReplaceComparisonOperator_Eq_Is,1,,,,0,0,0,1,"Turns ""=="" comparison to ""is"" with a string literal.",SyntaxWarning when no __pycache__ is present.,"Mutant raises a SyntaxWarning on import, but only if no __pycache__ is present."
@@ -157,7 +157,7 @@
 11243,python-string-utils,_regex.py,core/ReplaceBinaryOperator_BitOr_RShift,2,1049aec9,4c537fbf,,1,0,0,1,"Turns ""|"" to "">>"" for regex flags.",Replacing functions of stdlib type re.RegexFlag.,"Mutant effectively removes the ""re.UNICODE"" flag for a regex, but this flag is on by default in python."
 5908,python-string-utils,generation.py,core/NumberReplacer,13,5249ec51,108fdad3,fab4cb98,1,0,0,1,"Turns ""> 0"" comparison to ""> -1"" where the other operand cannot be 0 or negative.",Replacing builtin isinstance.,"Killing the mutant requires creating an illegal int object and modifying the ""isinstance"" function."
 6719,python-string-utils,generation.py,core/ReplaceComparisonOperator_Gt_Eq,2,cc5b9fa1,f39c6f7d,,0,0,1,1,"Turns "">"" comparison to ""=="" with ints.",Replacing builtin isinstance.,"Mutant changes ""step > 0 and (start > stop or start + step > stop)"" to ""step == 0 and (start > stop or start + step > stop)"", where start, stop and step have to be ints."
-10789,python-string-utils,generation.py,core/ReplaceComparisonOperator_Gt_GtE,1,,,,0,0,1,0,"Turns "">"" comparison to "">="" with ints.",Replacing builtin isinstance.,"Mutant changes ""step > 0 and (start > stop or start + step > stop)"" to ""step >= 0 and (start > stop or start + step > stop)"", where start, stop and step have to be ints."
+10789,python-string-utils,generation.py,core/ReplaceComparisonOperator_Gt_GtE,1,,,,0,0,1,1,"Turns "">"" comparison to "">="" with ints.",Replacing builtin isinstance.,"Mutant changes ""step > 0 and (start > stop or start + step > stop)"" to ""step >= 0 and (start > stop or start + step > stop)"", where start, stop and step have to be ints."
 10057,python-string-utils,manipulation.py,core/NumberReplacer,15,e7ff1af8,2e25decd,,0,0,0,1,,,
 10056,python-string-utils,manipulation.py,core/NumberReplacer,55,927d9eb6,,,0,0,0,1,,,
 9908,python-string-utils,manipulation.py,core/NumberReplacer,73,8df9e160,08e237cb,,0,0,0,1,,,
