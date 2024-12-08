@@ -1330,6 +1330,55 @@ sampled_mutants.rename(columns=column_mapping).assign(equivalent=None, unsure=No
 )
 
 
+# %% Read sample data
+
+sample_data = pd.read_csv(REPO_PATH / "samples" / "sampled_mutants.csv")
+column_mapping = {
+    "equivalent": "sample.equivalent",
+    "unsure": "sample.unsure",
+    "change": "sample.change",
+    "kill_method": "sample.kill_method",
+    "comment": "sample.comment",
+}
+
+
+def sample_row_to_dict(row):
+    return {val: row[key] for key, val in column_mapping.items()}
+
+
+def sample_row_to_mutant_id(row):
+    return MutantId(
+        project=row["project"],
+        target_path=row["target_path"],
+        mutant_op=row["mutant_op"],
+        occurrence=row["occurrence"],
+    )
+
+
+def convert_csv_value(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if np.isnan(value):
+        return None
+    if value == 0:
+        return False
+    if value == 1:
+        return True
+    return value
+
+
+sample_data = {sample_row_to_mutant_id(row): sample_row_to_dict(row) for _, row in sample_data.iterrows()}
+
+for name in column_mapping.values():
+    data[name] = data["mutant_id"].map(
+        lambda mutant_id: convert_csv_value(sample_data[mutant_id][name]) if mutant_id in sample_data else None
+    )
+    # data[name] = data[name].map(lambda val: None if np.isnan(val) else None)
+data["sampled"] = data["sample.equivalent"].map(lambda b: b is not None)
+
+
 # %% Check which percentage of mutants with n claims were (not) killed
 
 mutant_data = data[data["preset"] == "debugging_one_shot"]
@@ -1363,21 +1412,19 @@ failed_test_regex = re.compile(r"TEST FAILED: \[([^\]]+)\]")
 for match in re.finditer(failed_test_regex, x):
     print(match.group(1))
 
-# %%
+# %% Overview over sampled mutants
 
-sample_data = pd.read_csv(REPO_PATH / "samples" / "sampled_mutants.csv")
-sample_data["equivalent"].sum()
-
-
-def count_claims(row):
-    for i in range(3):
-        claim = row[f"claim{i+1}"]
-        if isinstance(claim, float):
-            return i
-    return 3
-
-
-# %%
-
-sample_data["num_claims"] = sample_data.apply(count_claims, axis=1)
-sample_data.groupby("num_claims").mean("equivalent")
+target_data = data[data["preset"] == "debugging_one_shot"]
+for n in target_data["mutant.num_equivalence_claims"].unique():
+    print(
+        f"claims: {n}, equivalent: yes -> {len(target_data[target_data["sampled"] & (target_data["sample.equivalent"] == True) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+    )
+    print(
+        f"claims: {n}, equivalent: no -> {len(target_data[target_data["sampled"] & (target_data["sample.equivalent"] == False) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+    )
+    print(
+        f"claims: {n}, equivalent: yes, unsure -> {len(target_data[target_data["sampled"] & target_data["sample.unsure"] & (target_data["sample.equivalent"] == True) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+    )
+    print(
+        f"claims: {n}, equivalent: no, unsure -> {len(target_data[target_data["sampled"] & target_data["sample.unsure"] & (target_data["sample.equivalent"] == False) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+    )
