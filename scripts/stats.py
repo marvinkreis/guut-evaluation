@@ -2,9 +2,9 @@
 
 import json
 import os
-import re
 import sqlite3
 import math
+import re
 from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
@@ -67,6 +67,7 @@ def prepare_loop_result(loop_result: JsonObj):
                         coverage["covered_branches"] = []
                         coverage["missing_branches"] = []
                     del coverage["raw"]
+                exec_result["output"] = exec_result["output"][:5000]
 
     # Prepare experiments
     for experiment in loop_result["experiments"]:
@@ -89,6 +90,7 @@ def prepare_loop_result(loop_result: JsonObj):
                         coverage["covered_branches"] = []
                         coverage["missed_branches"] = []
                     del coverage["raw"]
+                exec_result["output"] = exec_result["output"][:5000]
 
     # Prepare messages
     for msg in loop_result["conversation"]:
@@ -234,10 +236,17 @@ class CosmicRayInfo(NamedTuple):
     output: str
 
 
+FAILED_TEST_REGEX = re.compile(r"TEST FAILED: \[([^\]]+)\]")
+
+
 def test_outcome_kills(cosmic_ray_outcome):
     if cosmic_ray_outcome not in ["SURVIVED", "KILLED"]:
         raise Exception(f"Unexpected test outcome: {cosmic_ray_outcome}")
     return cosmic_ray_outcome == "KILLED"
+
+
+def get_failing_tests_for_output(output: str) -> List[str]:
+    return [match.group(1) for match in re.finditer(FAILED_TEST_REGEX, output)]
 
 
 def read_mutant_results(mutants_file: Path, project: str) -> Dict[MutantId, CosmicRayInfo]:
@@ -285,10 +294,6 @@ data["cosmic_ray.killed_by_any"] = data.apply(
     ),
     axis=1,
 )
-data["cosmic_ray.output"] = data.apply(
-    lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][mutant_id_from_row(row)].output,
-    axis=1,
-)
 
 data["cosmic_ray_full.killed_by_own"] = data.apply(
     lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].killed,
@@ -301,8 +306,10 @@ data["cosmic_ray_full.killed_by_any"] = data.apply(
     ),
     axis=1,
 )
-data["cosmic_ray_full.output"] = data.apply(
-    lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].output,
+data["cosmic_ray_full.failing_tests"] = data.apply(
+    lambda row: get_failing_tests_for_output(
+        cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].output
+    ),
     axis=1,
 )
 
@@ -311,8 +318,14 @@ del cosmic_ray_results
 
 # %% Read Pynguin cosmic-ray results
 
+PYNGUIN_FAILED_TEST_REGEX = re.compile(r"Test failed: (.*)")
 
-pynguin_data = dict(project=[], index=[], mutant_id=[], killed=[], output=[])
+
+def get_failing_tests_for_pynguin_output(output: str) -> List[str]:
+    return [match.group(1) for match in re.finditer(PYNGUIN_FAILED_TEST_REGEX, output)]
+
+
+pynguin_data = dict(project=[], index=[], mutant_id=[], killed=[], failing_tests=[])
 # Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
 for mutants_path in PYNGUIN_TESTS_DIR.glob("*/*/cosmic-ray/mutants.sqlite"):
     project = mutants_path.parent.parent.parent.name
@@ -326,7 +339,7 @@ for mutants_path in PYNGUIN_TESTS_DIR.glob("*/*/cosmic-ray/mutants.sqlite"):
         pynguin_data["index"].append(int(index))
         pynguin_data["mutant_id"].append(mutant_id)
         pynguin_data["killed"].append(cosmic_ray_info.killed)
-        pynguin_data["output"].append(cosmic_ray_info.output)
+        pynguin_data["failing_tests"].append(get_failing_tests_for_pynguin_output(cosmic_ray_info.output))
 pynguin_data = pd.DataFrame(pynguin_data)
 
 
@@ -749,7 +762,6 @@ data["output_diff"] = data.apply(lambda row: has_output_difference(row), axis=1)
 with open("/proc/self/status") as f:
     memusage = f.read().split("VmRSS:")[1].split("\n")[0][:-3]
     print(f"Memory used: {int(memusage.strip()) / (1024**2):.3f} GB")
-
 
 # %% Print available columns
 
@@ -1405,12 +1417,6 @@ data[data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].
 print(len(data[data["cosmic_ray.killed_by_own"]]))
 print(len(data[data["pynguin.cosmic_ray.killed_by_any"]]))
 
-# %%
-
-x = data["cosmic_ray_full.output"][4]
-failed_test_regex = re.compile(r"TEST FAILED: \[([^\]]+)\]")
-for match in re.finditer(failed_test_regex, x):
-    print(match.group(1))
 
 # %% Overview over sampled mutants
 
