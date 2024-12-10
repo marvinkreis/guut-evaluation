@@ -2,7 +2,6 @@ Counts as equivalent:
     - Having to break conventions of builtins or the standard library in order to kill the mutant.
         - Replacing builtin functions to change their behavior in unexpected ways.
         - Creating unexpected objects (e.g. objects without a "__class__" attribute).
-        - Replacing sys.version_info.
         - Creating subclasses of standard types (e.g. list, str) that change their behavior in unexpected ways.
     - Having to change the environment in order to kill the mutant. (e.g. changing to a different OS or Python interpreter)
 
@@ -13,5 +12,6 @@ Counts as killable:
     - Having to create a class that is "==" to a builtin class.
     - Having to create an object that is "==" to some other object.
     - Having to count method invocations (even on subtypes of standard types) to kill the mutant.
+    - Having to mock sys.version_info or the OS name.
 
 Equivalence status is determined for "cpython-3.8.19-linux-x86_64-gnu" on Linux.
