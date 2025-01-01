@@ -8,7 +8,7 @@ import re
 from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast
+from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, Callable
 
 import matplotlib.pylab as plt
 import numpy as np
@@ -18,11 +18,13 @@ from tqdm import tqdm
 
 pd.set_option("display.width", None)
 pd.set_option("display.max_colwidth", None)
-pd.set_option("display.float_format", lambda x: f"{int(x):d}" if math.floor(x) == x else f"{x:.3f}")
+pd.set_option(
+    "display.float_format", lambda x: f"{int(x):d}" if math.floor(x) == x else f"{x:.3f}" if x > 1000 else f"{x:.6f}"
+)
 # pd.DataFrame.__str__ = pd.DataFrame.to_string
 # pd.DataFrame.__repr__ = pd.DataFrame.to_string
 
-JsonObj = Dict[str, Any]
+type JsonObj = Dict[str, Any]
 OUTPUT_PATH = Path("/tmp/out")
 OUTPUT_PATH.mkdir(exist_ok=True)
 
@@ -39,6 +41,43 @@ else:
 RESULTS_DIR = REPO_PATH / "guut_emse_results"
 PYNGUIN_TESTS_DIR = REPO_PATH / "pynguin_emse_tests"
 MUTANTS_DIR = REPO_PATH / "emse_projects_data" / "mutants_sampled"
+
+
+# %% Read and prepare data
+# ======================================================================================================================
+
+
+# %% Define some constants and helpers
+
+PRESETS = [
+    "baseline_without_iterations",
+    "baseline_with_iterations",
+    "debugging_zero_shot",
+    "debugging_one_shot",
+]
+
+PRESET_NAMES = [
+    "Baseline w/o iterations",
+    "Baseline w/ iterations",
+    "Scientific Debugging (0-shot)",
+    "Scientific Debugging (1-shot)",
+]
+
+
+class LongId(NamedTuple):
+    preset: str
+    package: str
+    project: str
+    id: str
+
+    @staticmethod
+    def parse(long_id: str) -> "LongId":
+        parts = results_dir.name.split("_")
+        preset = "_".join(parts[:3])
+        package = "_".join(parts[3:-1])
+        project = package_to_project[package]
+        id = parts[-1]
+        return LongId(preset, package, project, id)
 
 
 # %% Load json result files
@@ -60,6 +99,7 @@ def prepare_loop_result(loop_result: JsonObj):
             for exec_result in [result["correct"], result["mutant"]]:
                 # If coverage is present, parse branch coverage and delete the raw coverage to save memory
                 if coverage := exec_result["coverage"]:
+                    # TODO: read coverage for all files here, not just the target path
                     if raw_file_coverage := coverage["raw"]["files"][f"{module_name}/{target_path}"]:
                         coverage["covered_branches"] = raw_file_coverage["executed_branches"]
                         coverage["missing_branches"] = raw_file_coverage["missing_branches"]
@@ -83,6 +123,7 @@ def prepare_loop_result(loop_result: JsonObj):
                     continue
                 # If coverage is present, parse branch coverage and delete the raw coverage to save memory
                 if coverage := exec_result["coverage"]:
+                    # TODO: read coverage for all files here, not just the target path
                     if raw_file_coverage := coverage["raw"]["files"][f"{module_name}/{target_path}"]:
                         coverage["covered_branches"] = raw_file_coverage["executed_branches"]
                         coverage["missed_branches"] = raw_file_coverage["missing_branches"]
@@ -91,10 +132,6 @@ def prepare_loop_result(loop_result: JsonObj):
                         coverage["missed_branches"] = []
                     del coverage["raw"]
                 exec_result["output"] = exec_result["output"][:5000]
-
-    # Prepare messages
-    for msg in loop_result["conversation"]:
-        del msg["content"]
 
 
 def read_result_full(path: Path) -> JsonObj:
@@ -181,6 +218,9 @@ SUCCESS = "success"
 EQUIVALENT = "equivalent"
 FAIL = "fail"
 
+OUTCOMES = [SUCCESS, EQUIVALENT, FAIL]
+OUTCOME_NAMES = ["Success", "Claimed Equivalent", "Failed"]
+
 
 def get_outcome(row):
     if row["mutant_killed"]:
@@ -227,6 +267,59 @@ data["mutant_lines.start"] = data["mutant_lines"].map(lambda t: t[0])
 data["mutant_lines.end"] = data["mutant_lines"].map(lambda t: t[1])
 del mutant_lines
 
+# %% Read coverage info
+
+# coverage.py only counts lines or branches as missing if the containing module was at least loaded (TODO: confirm).
+# This could lead to a different number of total branches between the measurements. The coverage measures can however
+# still easily be compared by dividing the number of hit lines/branches by the number of the union of all recorded
+# lines/branches. This means that the coverage might still be off compared to the "true" coverage containing all lines # and branches in the project, but all coverage measurements will be equally off.
+
+
+coverage_map = {}
+
+
+class LineId(NamedTuple):
+    file_name: str
+    line: int
+
+
+class BranchId(NamedTuple):
+    file_name: str
+    line_1: int
+    line_2: int
+
+
+class Coverage(NamedTuple):
+    missing_lines: List[LineId]
+    executed_lines: List[LineId]
+    missing_branches: List[BranchId]
+    executed_branches: List[BranchId]
+
+
+def read_coverage(coverage_json: JsonObj):
+    missing_lines = []
+    executed_lines = []
+    missing_branches = []
+    executed_branches = []
+    for file_name, file in coverage_json["files"]:
+        # missing_lines += [f"{file_name}::{line}" for line in file["missing_lines"]]
+        # executed_lines += [f"{file_name}::{line}" for line in file["executed_lines"]]
+        # missing_branches += [f"{file_name}::{branch}" for branch in file["missing_branches"]]
+        # executed_branches += [f"{file_name}::{branch}" for branch in file["executed_branches"]]
+        missing_lines += [LineId(file_name, line) for line in file["missing_lines"]]
+        executed_lines += [LineId(file_name, line) for line in file["executed_lines"]]
+        missing_branches += [BranchId(file_name, branch[0], branch[1]) for branch in file["missing_branches"]]
+        executed_branches += [BranchId(file_name, branch[0], branch[1]) for branch in file["executed_branches"]]
+    return Coverage(missing_lines, executed_lines, missing_branches, executed_branches)
+
+
+for coverage_path in RESULTS_DIR.glob("*/coverage/coverage.json"):
+    results_dir = (coverage_path / ".." / "..").resolve()
+    id = LongId.parse(results_dir.name)
+    with coverage_path.open("r") as f:
+        coverage_json = json.load(f)
+    coverage_map[(id.project, id.preset)] = read_coverage(coverage_json)
+
 
 # %% Add cosmic-ray results
 
@@ -271,15 +364,12 @@ cosmic_ray_results = {}
 # Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
 for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
     results_dir = (mutants_path / ".." / "..").resolve()
-    parts = results_dir.name.split("_")
-    preset = "_".join(parts[:3])
-    package = "_".join(parts[3:-1])
-    project = package_to_project[package]
-    cosmic_ray_results[(project, preset, "exitfirst")] = read_mutant_results(
-        results_dir / "cosmic-ray" / "mutants.sqlite", project
+    id = LongId.parse(results_dir.name)
+    cosmic_ray_results[(id.project, id.preset, "exitfirst")] = read_mutant_results(
+        results_dir / "cosmic-ray" / "mutants.sqlite", id.project
     )
-    cosmic_ray_results[(project, preset, "full")] = read_mutant_results(
-        results_dir / "cosmic-ray-full" / "mutants.sqlite", project
+    cosmic_ray_results[(id.project, id.preset, "full")] = read_mutant_results(
+        results_dir / "cosmic-ray-full" / "mutants.sqlite", id.project
     )
 
 
@@ -609,17 +699,22 @@ data["usage.completion_tokens"] = data["conversation"].map(
 data["usage.cached_tokens"] = data["conversation"].map(
     lambda c: sum(msg["usage"].get("cached_tokens", 0) for msg in c if msg["role"] == "assistant")
 )
+data["usage.uncached_prompt_tokens"] = data["usage.prompt_tokens"] - data["usage.cached_tokens"]
 data["usage.total_tokens"] = data["usage.prompt_tokens"] + data["usage.completion_tokens"]
 
-# Add cost in $ for gpt-4o-mini
 # prompt: $0.150 / 1M input tokens
+data["usage.cost.uncached_prompt_tokens"] = data["usage.uncached_prompt_tokens"] * 0.150 / 1_000_000
+
 # cached prompt: $0.075 / 1M input tokens
+data["usage.cost.cached_tokens"] = data["usage.cached_tokens"] * 0.075 / 1_000_000
+
 # completion: $0.600 / 1M input tokens
+data["usage.cost.completion_tokens"] = data["usage.completion_tokens"] * 0.600 / 1_000_000
+
+# Add cost in $ for gpt-4o-mini
 data["usage.cost"] = (
-    ((data["usage.prompt_tokens"] - data["usage.cached_tokens"]) * 0.150)
-    + (data["usage.cached_tokens"] * 0.075)
-    + (data["usage.completion_tokens"] * 0.600)
-) / 1_000_000
+    data["usage.cost.uncached_prompt_tokens"] + data["usage.cost.cached_tokens"] + data["usage.cost.completion_tokens"]
+)
 
 
 # %% Compute Token Usage of first 10 messages
@@ -683,7 +778,46 @@ data["num_completions"] = data["conversation"].map(
 )
 data["num_experiments"] = data["experiments"].map(len)
 data["num_tests"] = data["tests"].map(len)
+
+# TODO: count equivalence claim as a turn?
 data["num_turns"] = data["num_experiments"] + data["num_tests"]
+
+
+EQUIVALENCE_HEADLINE_REGEX = re.compile(r"^(#+) +([a-zA-Z0-9]+ +)*equiv", re.IGNORECASE)
+
+
+def count_turns_before_equivalence(conversation):
+    count = 0
+    for msg in conversation:
+        if msg["role"] != "assistant":
+            continue
+
+        if any(re.match(EQUIVALENCE_HEADLINE_REGEX, line) for line in msg["content"].splitlines()):
+            break
+        elif msg["tag"] in ["experiment_stated", "test_stated"]:
+            count += 1
+        elif msg["tag"] == "claimed_equivalent":
+            raise Exception("this shouldn't happen")
+    return count
+
+
+def count_completions_before_equivalence(conversation):
+    count = 0
+    for msg in conversation:
+        if msg["role"] != "assistant":
+            continue
+
+        if any(re.match(EQUIVALENCE_HEADLINE_REGEX, line) for line in msg["content"].splitlines()):
+            break
+        elif msg["tag"] == "claimed_equivalent":
+            raise Exception("this shouldn't happen")
+
+        count += 1
+    return count
+
+
+data["num_turns_before_equivalence_claim"] = data["conversation"].map(count_turns_before_equivalence)
+data["num_completions_before_equivalence_claim"] = data["conversation"].map(count_completions_before_equivalence)
 
 data["num_invalid_experiments"] = data["experiments"].map(
     lambda exps: len([exp for exp in exps if not exp["validation_result"]["valid"]])
@@ -770,6 +904,13 @@ mid = int(((len(cols) + 1) // 2))
 for x, y in zip(cols[:mid] + [""], cols[mid:] + [""]):
     print(f"{x:<40} {y}")
 
+# %% Misc Plots and Data
+# ======================================================================================================================
+
+
+class MiscPlotsAndData:  # make this easy to see in the outline panel
+    pass
+
 
 # %% Strings to colors
 
@@ -792,20 +933,68 @@ def string_colors(strings: Iterable[str], num_colors=10):
     return colors
 
 
+# %% Number of turns
+
+# for preset in data["preset"].unique():
+#     target_data = data[data["preset"] == preset]
+#
+#     fig, ax = plt.subplots(layout="constrained", figsize=(8, 4))
+#     bins = np.arange(11) + 1
+#
+#     ax.set_xticks(bins)
+#     ax.hist(
+#         target_data["num_turns"],
+#         bins=[float(x) for x in bins],
+#         rwidth=0.8,
+#     )
+#     ax.legend(["Number of Conversations with N Turns"], loc="upper left")
+#     fig.text(0.00, 1.02, preset)
+#     plt.show()
+
+
+# %% Number of turns per successful / unsuccessful run
+
+# for preset in data["preset"].unique():
+#     target_data = data[data["preset"] == preset]
+#
+#     turns_success = target_data["num_turns"][target_data["outcome"] == SUCCESS]
+#     turns_equivalent = target_data["num_turns"][target_data["outcome"] == EQUIVALENT]
+#     turns_fail = target_data["num_turns"][target_data["outcome"] == FAIL]
+#
+#     fig, ax = plt.subplots(layout="constrained", figsize=(8, 4))
+#     bins = np.arange(11) + 1
+#
+#     ax.set_xticks(bins)
+#     ax.hist(
+#         [turns_success, turns_equivalent, turns_fail],
+#         bins=[float(x) for x in bins],
+#         rwidth=1,
+#     )
+#     ax.legend(
+#         [
+#             "Number of Conversations with N Turns (Success)",
+#             "Number of Conversations with N Turns (Claimed Equivalent)",
+#             "Number of Conversations with N Turns (Failed)",
+#         ],
+#         loc="upper right",
+#     )
+#     fig.text(0.00, 1.02, preset)
+#     plt.show()
+
+
 # %% Plot Coverage
 
 
 USE_BRANCH_COVERAGE = True
 
 
-def add_coverage(x: List[str], y: List[str]) -> List[str]:
+def add_ids(x: List[str], y: List[str]) -> List[str]:
     acc = set(x)
     acc.update(y)
     return list(acc)
 
 
-add_coverage_np = np.frompyfunc(add_coverage, 2, 1)
-
+add_ids_np = np.frompyfunc(add_ids, 2, 1)
 
 for project in np.unique(data[["project"]]):
     fig, ax = plt.subplots(layout="constrained", figsize=(8, 4))
@@ -819,11 +1008,11 @@ for project in np.unique(data[["project"]]):
         target_data = target_data.sort_values(by=["module.num_mutants", "problem.target_path"], ascending=False)
 
         if USE_BRANCH_COVERAGE:
-            acc_coverage = add_coverage_np.accumulate(target_data["coverage.covered_branch_ids"])
-            all_coverable_objects = reduce(add_coverage, target_data["coverage.all_branch_ids"], [])
+            acc_coverage = add_ids_np.accumulate(target_data["coverage.covered_branch_ids"])
+            all_coverable_objects = reduce(add_ids, target_data["coverage.all_branch_ids"], [])
         else:
-            acc_coverage = add_coverage_np.accumulate(target_data["coverage.covered_line_ids"])
-            all_coverable_objects = reduce(add_coverage, target_data["coverage.all_line_ids"], [])
+            acc_coverage = add_ids_np.accumulate(target_data["coverage.covered_line_ids"])
+            all_coverable_objects = reduce(add_ids, target_data["coverage.all_line_ids"], [])
 
         coverage_percent = np.vectorize(lambda c: len(c) / max(len(all_coverable_objects), 1))
         acc_coverage_percent = coverage_percent(acc_coverage)
@@ -844,120 +1033,6 @@ for project in np.unique(data[["project"]]):
 
     fig.text(0.00, 1.02, project)
     ax.legend()
-    plt.show()
-
-
-# %% Token usage mean for a single mutant
-
-data.groupby("preset")[["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]].mean()
-# %% Token usage mean for a single project (1000 or less mutants)
-
-data.groupby(["preset", "project"])[["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]].sum().groupby(
-    "preset"
-).mean()
-# %% Token usage for each single project (1000 or less mutants)
-
-data.groupby(["preset", "project"])[["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]].sum()
-
-# %% Token usage sum
-
-data[["usage.prompt_tokens", "usage.completion_tokens", "usage.cost"]].sum()
-
-# %% Number of turns
-
-target_data = {preset: data[data["preset"] == preset] for preset in data["preset"].unique()}
-
-fig, ax = plt.subplots(layout="constrained", figsize=(10, 6))
-ax.set_xticks(np.arange(len(target_data)) + 1)
-ax.set_xticklabels([preset for preset in target_data.keys()])
-ax.violinplot([preset_data["num_turns"] for preset_data in target_data.values()], showmeans=True)
-ax.legend(["Number of Turns"], loc="upper left")
-plt.show()
-
-
-# %% Number of turns per successful / unsuccessful run
-
-for preset in data["preset"].unique():
-    target_data = data[data["preset"] == preset]
-
-    turns_success = target_data["num_turns"][target_data["outcome"] == SUCCESS]
-    turns_equivalent = target_data["num_turns"][target_data["outcome"] == EQUIVALENT]
-    turns_fail = target_data["num_turns"][target_data["outcome"] == FAIL]
-
-    if len(turns_equivalent) == 0:
-        turns_equivalent = [0]
-        num_equivalent = 0
-    else:
-        num_equivalent = len(turns_equivalent)
-
-    fig, ax = plt.subplots(layout="constrained", figsize=(8, 6))
-    ax.set_xticks([1, 2, 3])
-    ax.set_xticklabels(
-        [
-            f"Success ({len(turns_success)} runs)",
-            f"Claimed Equivalent ({num_equivalent} runs)",
-            f"Failed ({len(turns_fail)} runs)",
-        ]
-    )
-    ax.violinplot(
-        [
-            turns_success,
-            turns_equivalent,
-            turns_fail,
-        ],
-        showmeans=True,
-    )
-    ax.legend(["Number of Turns"], loc="upper left")
-    fig.text(0.00, 1.02, preset)
-    plt.show()
-
-
-# %% Number of turns
-
-for preset in data["preset"].unique():
-    target_data = data[data["preset"] == preset]
-
-    fig, ax = plt.subplots(layout="constrained", figsize=(8, 4))
-    bins = np.arange(11) + 1
-
-    ax.set_xticks(bins)
-    ax.hist(
-        target_data["num_turns"],
-        bins=[float(x) for x in bins],
-        rwidth=0.8,
-    )
-    ax.legend(["Number of Conversations with N Turns"], loc="upper left")
-    fig.text(0.00, 1.02, preset)
-    plt.show()
-
-
-# %% Number of turns per successful / unsuccessful run
-
-for preset in data["preset"].unique():
-    target_data = data[data["preset"] == preset]
-
-    turns_success = target_data["num_turns"][target_data["outcome"] == SUCCESS]
-    turns_equivalent = target_data["num_turns"][target_data["outcome"] == EQUIVALENT]
-    turns_fail = target_data["num_turns"][target_data["outcome"] == FAIL]
-
-    fig, ax = plt.subplots(layout="constrained", figsize=(8, 4))
-    bins = np.arange(11) + 1
-
-    ax.set_xticks(bins)
-    ax.hist(
-        [turns_success, turns_equivalent, turns_fail],
-        bins=[float(x) for x in bins],
-        rwidth=1,
-    )
-    ax.legend(
-        [
-            "Number of Conversations with N Turns (Success)",
-            "Number of Conversations with N Turns (Claimed Equivalent)",
-            "Number of Conversations with N Turns (Failed)",
-        ],
-        loc="upper right",
-    )
-    fig.text(0.00, 1.02, preset)
     plt.show()
 
 
@@ -1404,18 +1479,13 @@ for num_claims in [0, 1, 2, 3]:
 del mutant_data
 
 
-# %%
+# %% Anomalies
 
 data[data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].apply(
     lambda row: (row["preset"], row["mutant_id"].project), axis=1
 ).unique()
 # data[["mutant_id"]][data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]]
 # (data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]).value_counts()
-
-# %%
-
-print(len(data[data["cosmic_ray.killed_by_own"]]))
-print(len(data[data["pynguin.cosmic_ray.killed_by_any"]]))
 
 
 # %% Overview over sampled mutants
@@ -1434,3 +1504,483 @@ for n in target_data["mutant.num_equivalence_claims"].unique():
     print(
         f"claims: {n}, equivalent: no, unsure -> {len(target_data[target_data["sampled"] & target_data["sample.unsure"] & (target_data["sample.equivalent"] == False) & (target_data["mutant.num_equivalence_claims"] == n)])}"
     )
+
+
+# %% Define plot helper functions
+# ======================================================================================================================
+
+
+class PlotHelpers:  # make this easy to see in the outline panel
+    pass
+
+
+def query_group(grouped_data, group, fun, default):
+    try:
+        return fun(grouped_data.get_group(group))
+    except KeyError:
+        return default
+
+
+def plot_bar_per_group(
+    grouped_data: Any,
+    groups: List[Tuple[str, str]],
+    cols: List[Tuple[str, Callable[[Any], Any]]],
+    customization: Callable[[Any, Any], None] | None = None,
+):
+    values = [[query_group(grouped_data, group_key, fun, 0) for group_key, group_name in groups] for name, fun in cols]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    for i in range(len(values)):
+        ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i])
+
+    ax.set_xticks(np.arange(len(groups)))
+    ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
+    fig.legend([c[0] for c in cols], loc="lower right")
+
+    if customization:
+        customization(fig, ax)
+
+
+def plot_violin_per_group(
+    grouped_data: Any,
+    groups: List[Tuple[str, str]],
+    col_name: str,
+    col_fun: Callable[[Any], Any],
+    customization: Callable[[Any, Any], None] | None = None,
+):
+    values = [query_group(grouped_data, group_key, col_fun, [0]) for group_key, group_name in groups]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(6, 6))
+    ax.violinplot(values, showmeans=True, widths=np.repeat(1, len(groups)))
+
+    ax.set_xticks(np.arange(len(groups)) + 1)
+    ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
+    fig.legend([col_name], loc="lower right")
+
+    if customization:
+        customization(fig, ax)
+
+
+# %% Shelved Plots and Data
+# ======================================================================================================================
+
+
+class ShelvedPlotsAndData:  # make this easy to see in the outline panel
+    pass
+
+
+# %% Plot percentage of direct kills
+
+
+def plot_percentage_of_direct_kills():
+    ticks = []
+    percentages = []  # [direct kill, kill with tests from same run, kill with any tests]
+
+    for preset in data["settings.preset_name"].unique():
+        for project in data["project"].unique():
+            target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
+            ticks.append(f"{project} {preset}")
+            percentages.append(
+                [
+                    len(target_data[target_data["mutant_killed"]]) / len(target_data),
+                    len(target_data[target_data["cosmic_ray.killed_by_own"]]) / len(target_data),
+                    len(target_data[target_data["cosmic_ray.killed_by_any"]]) / len(target_data),
+                ]
+            )
+
+    color1 = cmap_colors[0]
+    color3 = cmap_colors[1]
+    color2 = ((color1[0] + color3[0]) / 2, (color1[1] + color3[1]) / 2, (color1[2] + color3[2]) / 2)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
+    x = np.arange(len(ticks))
+    bar1 = ax.bar(x, [p[0] for p in percentages], color=cmap_colors[0])
+    bar2 = ax.bar(
+        x,
+        [p[1] - p[0] for p in percentages],
+        color=cmap_colors[2],
+        bottom=[p[0] for p in percentages],
+    )
+    bar3 = ax.bar(
+        x,
+        [p[2] - p[1] for p in percentages],
+        color=cmap_colors[4],
+        bottom=[p[1] for p in percentages],
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(ticks, rotation=90)
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
+    ax.legend(
+        [bar3, bar2, bar1],
+        [
+            "Mutants killed by any test.",
+            "Mutants killed by tests from the same preset.",
+            "Mutants killed by sucessful runs.",
+        ],
+    )
+    plt.show()
+
+    del ticks
+    del percentages
+
+
+plot_percentage_of_direct_kills()
+
+
+# %% Paper RQ 1: How do our LLM-based approaches differ?
+# ======================================================================================================================
+
+
+class RQ1:  # make this easy to see in the outline panel
+    pass
+
+
+# %% Usage (token and costs)
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class Usage:  # make this easy to see in the outline panel
+    pass
+
+
+token_cols = [
+    "usage.cached_tokens",
+    "usage.uncached_prompt_tokens",
+    "usage.completion_tokens",
+    "usage.cost.cached_tokens",
+    "usage.cost.uncached_prompt_tokens",
+    "usage.cost.completion_tokens",
+    "usage.cost",
+]
+
+# %% Mean usage for a single mutant
+
+data.groupby("preset")[token_cols].mean()
+
+# %% Mean usage mean for a single project (1000 or fewer mutants)
+
+data.groupby(["preset", "project"])[token_cols].sum().groupby("preset").mean()
+
+# %% Total usage
+
+data[token_cols].sum()
+
+# %% Plot mean cost per preset and project
+
+
+def plot_mean_cost_2d():
+    projects = sorted(list(data["project"].unique()))
+    plot_data = data.groupby(["preset", "project"])
+
+    x = []
+    y = []
+    s = []
+
+    for y_, preset in enumerate(PRESETS[::-1]):
+        for x_, project in enumerate(projects):
+            group = plot_data.get_group((preset, project))
+            x.append(x_)
+            y.append(y_)
+            s.append(group["usage.cost"].mean())
+
+    s = np.array(s)
+    s = s / s.max() * 1500
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 4))
+    ax.scatter(x=x, y=y, s=s)
+
+    ax.set_ylim((-0.5, 3.5))
+    ax.set_yticks(range(4))
+    ax.set_yticklabels(PRESETS[::-1])
+
+    ax.set_xlim((-0.5, 9.5))
+    ax.set_xticks(range(10))
+    ax.set_xticklabels(projects, rotation=90)
+
+    fig.show()
+
+
+plot_mean_cost_2d()
+
+
+# %% Plot mean number of tokens for one mutant
+
+
+def plot_num_tokens_per_mutant():
+    plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [
+            ("Prompt tokens (cached)", lambda df: df["usage.cached_tokens"].mean()),
+            ("Prompt tokens (uncached)", lambda df: df["usage.uncached_prompt_tokens"].mean()),
+            ("Completion tokens", lambda df: df["usage.completion_tokens"].mean()),
+        ],
+    )
+
+
+plot_num_tokens_per_mutant()
+
+# %% Plot mean cost for one mutant
+
+
+def plot_cost_per_mutant():
+    plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [
+            ("Cost for prompt tokens (cached)", lambda df: df["usage.cost.cached_tokens"].mean()),
+            ("Cost for prompt tokens (uncached)", lambda df: df["usage.cost.uncached_prompt_tokens"].mean()),
+            ("Cost for completion tokens", lambda df: df["usage.cost.completion_tokens"].mean()),
+        ],
+    )
+
+
+plot_cost_per_mutant()
+
+# %% Success rate
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class SuccessRate:  # make this easy to see in the outline panel
+    pass
+
+
+# %% Plot percentage of outcomes
+
+
+def plot_outcomes():
+    plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [
+            ("Success", lambda df: (df["outcome"] == SUCCESS).mean()),
+            ("Claimed Equivalent", lambda df: (df["outcome"] == EQUIVALENT).mean()),
+            ("Failed", lambda df: (df["outcome"] == FAIL).mean()),
+        ],
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
+    )
+
+
+plot_outcomes()
+
+
+# %% Number of turns / completions
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class NumberOfTurns:  # make this easy to see in the outline panel
+    pass
+
+
+# %% Number of turns
+
+
+def plot_num_turns():
+    plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of turns (responses containing runnable code)",
+        lambda df: df["num_turns"],
+    )
+
+
+plot_num_turns()
+
+# %% Number of turns (excluding turns after an equivalence claim is made)
+
+# There are 356 (=len(data[data["mutant_killed"] & data["claimed_equivalent"]])) mutants that were claimed
+# equivalent and then killed in the same conversation. This plot shows what the number of turns would look like
+# if we stopped at every equivalence claim.
+
+# The baselines start at 0 here, because baseline_with_iterations and baseline_without_iterations each had exactly
+# one run, where the first response was invalid and the second response was an equivalence claim.
+
+
+def plot_num_turns_before_equivalence_claim():
+    plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of turns before equivalence claim",
+        lambda df: df["num_turns_before_equivalence_claim"],
+    )
+
+
+plot_num_turns_before_equivalence_claim()
+
+
+# %% Number of completions (excluding completions after an equivalence claim is made)
+
+# The number of all messages generated by the LLM.
+# This includes invalid responses and equivalence claims.
+
+
+def plot_num_completions():
+    plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of completions",
+        lambda df: df["num_completions"],
+    )
+
+
+plot_num_completions()
+
+
+# %% Number of completions
+
+# The number of all messages generated by the LLM.
+# This includes invalid responses and equivalence claims.
+
+
+def plot_num_completions_before_equivalence_claim():
+    plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of completions",
+        lambda df: df["num_completions_before_equivalence_claim"],
+    )
+
+
+plot_num_completions_before_equivalence_claim()
+
+# %% Number of turns per outcome
+
+
+def plot_num_turns_per_outcome():
+    preset_data = data.groupby("preset")
+
+    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+        plot_violin_per_group(
+            preset_data.get_group(preset).groupby("outcome"),
+            list(zip(OUTCOMES, OUTCOME_NAMES)),
+            "Number of turns",
+            lambda df: df["num_turns"],
+            customization=lambda fig, ax: ax.set_title(preset_name),
+        )
+
+
+plot_num_turns_per_outcome()
+
+
+# %% Number of turns per outcome (excluding turns after an equivalence claim is made)
+
+
+def plot_num_turns_before_equivalence_claim_per_outcome():
+    preset_data = data.groupby("preset")
+
+    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+        plot_violin_per_group(
+            preset_data.get_group(preset).groupby("outcome"),
+            list(zip(OUTCOMES, OUTCOME_NAMES)),
+            "Number of turns before equivalence claim",
+            lambda df: df["num_turns_before_equivalence_claim"],
+            customization=lambda fig, ax: ax.set_title(preset_name),
+        )
+
+
+plot_num_turns_before_equivalence_claim_per_outcome()
+
+# %% Number of completions
+
+
+def plot_num_completions_per_outcome():
+    preset_data = data.groupby("preset")
+
+    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+        plot_violin_per_group(
+            preset_data.get_group(preset).groupby("outcome"),
+            list(zip(OUTCOMES, OUTCOME_NAMES)),
+            "Number of completions",
+            lambda df: df["num_completions"],
+            customization=lambda fig, ax: ax.set_title(preset_name),
+        )
+
+
+plot_num_completions_per_outcome()
+
+# %% Number of completions
+
+
+def plot_num_completions_before_equivalence_claim_per_outcome():
+    preset_data = data.groupby("preset")
+
+    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+        plot_violin_per_group(
+            preset_data.get_group(preset).groupby("outcome"),
+            list(zip(OUTCOMES, OUTCOME_NAMES)),
+            "Number of completions before equivalence claim",
+            lambda df: df["num_completions_before_equivalence_claim"],
+            customization=lambda fig, ax: ax.set_title(preset_name),
+        )
+
+
+plot_num_completions_before_equivalence_claim_per_outcome()
+
+# %% Paper RQ 2: How do resulting test suites compare?
+# ======================================================================================================================
+
+
+class RQ2:  # make this easy to see in the outline panel
+    pass
+
+
+# %% Mutation score
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MutationScore:  # make this easy to see in the outline panel
+    pass
+
+
+# %% Plot mean branch coverage
+
+# TODO: this only calculates the coverage for the CUT in one run
+# TODO: read total coverage data
+
+
+def plot_mean_branch_coverage():
+    plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [
+            (
+                "Mutation Score",
+                lambda df: (
+                    df["coverage.covered_branches"].map(len)
+                    / (df["coverage.covered_branches"].map(len) + df["coverage.missing_branches"].map(len))
+                ).sum()
+                / len(df),
+            ),
+        ],
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
+    )
+
+
+plot_mean_branch_coverage()
+
+
+# %% Plot mean mutation scores
+
+
+def plot_mean_mutation_scores():
+    plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [
+            ("Mutation Score", lambda df: df["cosmic_ray.killed_by_own"].sum() / len(df)),
+        ],
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
+    )
+
+
+plot_mean_mutation_scores()
+
+
+# %% sandbox 1
+plot_data = data.groupby("preset")
+group = plot_data.get_group("debugging_zero_shot")
+group_data = group.groupby("project")
+group_data["usage.prompt_tokens"].mean().sum()
+
+# %% sandbox 2
+print(data[(data["num_turns"] < 3) & (data["outcome"] == FAIL)][["preset", "id"]].to_string())
