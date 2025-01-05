@@ -21,8 +21,6 @@ pd.set_option("display.max_colwidth", None)
 pd.set_option(
     "display.float_format", lambda x: f"{int(x):d}" if math.floor(x) == x else f"{x:.3f}" if x > 1000 else f"{x:.6f}"
 )
-# pd.DataFrame.__str__ = pd.DataFrame.to_string
-# pd.DataFrame.__repr__ = pd.DataFrame.to_string
 
 type JsonObj = Dict[str, Any]
 OUTPUT_PATH = Path("/tmp/out")
@@ -41,6 +39,36 @@ else:
 RESULTS_DIR = REPO_PATH / "guut_emse_results"
 PYNGUIN_TESTS_DIR = REPO_PATH / "pynguin_emse_tests"
 MUTANTS_DIR = REPO_PATH / "emse_projects_data" / "mutants_sampled"
+
+
+# %% Helpers
+# ======================================================================================================================
+
+
+# %% Decorator to separate code into blocks (from stackoverflow.com/a/7718776)
+
+
+def block(function):
+    function()
+
+
+# %% Parse info from the results directory name
+
+
+class LongId(NamedTuple):
+    preset: str
+    package: str
+    project: str
+    id: str
+
+    @staticmethod
+    def parse(long_id: str) -> "LongId":
+        parts = results_dir.name.split("_")
+        preset = "_".join(parts[:3])
+        package = "_".join(parts[3:-1])
+        project = package_to_project[package]
+        id = parts[-1]
+        return LongId(preset, package, project, id)
 
 
 # %% Read and prepare data
@@ -62,22 +90,6 @@ PRESET_NAMES = [
     "Scientific Debugging (0-shot)",
     "Scientific Debugging (1-shot)",
 ]
-
-
-class LongId(NamedTuple):
-    preset: str
-    package: str
-    project: str
-    id: str
-
-    @staticmethod
-    def parse(long_id: str) -> "LongId":
-        parts = results_dir.name.split("_")
-        preset = "_".join(parts[:3])
-        package = "_".join(parts[3:-1])
-        project = package_to_project[package]
-        id = parts[-1]
-        return LongId(preset, package, project, id)
 
 
 # %% Load json result files
@@ -908,7 +920,7 @@ for x, y in zip(cols[:mid] + [""], cols[mid:] + [""]):
 # ======================================================================================================================
 
 
-class MiscPlotsAndData:  # make this easy to see in the outline panel
+class MiscPlotsAndData:  # mark this in the outline
     pass
 
 
@@ -1510,7 +1522,7 @@ for n in target_data["mutant.num_equivalence_claims"].unique():
 # ======================================================================================================================
 
 
-class PlotHelpers:  # make this easy to see in the outline panel
+class Plot_Helpers:  # mark this in the outline
     pass
 
 
@@ -1565,7 +1577,7 @@ def plot_violin_per_group(
 # ======================================================================================================================
 
 
-class ShelvedPlotsAndData:  # make this easy to see in the outline panel
+class Shelved_Plots_And_Data:  # mark this in the outline
     pass
 
 
@@ -1631,7 +1643,7 @@ plot_percentage_of_direct_kills()
 # ======================================================================================================================
 
 
-class RQ1:  # make this easy to see in the outline panel
+class RQ_1:  # mark this in the outline
     pass
 
 
@@ -1639,7 +1651,7 @@ class RQ1:  # make this easy to see in the outline panel
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Usage:  # make this easy to see in the outline panel
+class Usage:  # mark this in the outline
     pass
 
 
@@ -1668,6 +1680,7 @@ data[token_cols].sum()
 # %% Plot mean cost per preset and project
 
 
+@block
 def plot_mean_cost_2d():
     projects = sorted(list(data["project"].unique()))
     plot_data = data.groupby(["preset", "project"])
@@ -1700,12 +1713,10 @@ def plot_mean_cost_2d():
     fig.show()
 
 
-plot_mean_cost_2d()
-
-
 # %% Plot mean number of tokens for one mutant
 
 
+@block
 def plot_num_tokens_per_mutant():
     plot_bar_per_group(
         data.groupby("preset"),
@@ -1718,11 +1729,10 @@ def plot_num_tokens_per_mutant():
     )
 
 
-plot_num_tokens_per_mutant()
-
 # %% Plot mean cost for one mutant
 
 
+@block
 def plot_cost_per_mutant():
     plot_bar_per_group(
         data.groupby("preset"),
@@ -1735,19 +1745,18 @@ def plot_cost_per_mutant():
     )
 
 
-plot_cost_per_mutant()
-
 # %% Success rate
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SuccessRate:  # make this easy to see in the outline panel
+class Success_Rate:  # mark this in the outline
     pass
 
 
 # %% Plot percentage of outcomes
 
 
+@block
 def plot_outcomes():
     plot_bar_per_group(
         data.groupby("preset"),
@@ -1761,20 +1770,18 @@ def plot_outcomes():
     )
 
 
-plot_outcomes()
-
-
 # %% Number of turns / completions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NumberOfTurns:  # make this easy to see in the outline panel
+class Number_Of_Turns:  # mark this in the outline
     pass
 
 
 # %% Number of turns
 
 
+@block
 def plot_num_turns():
     plot_violin_per_group(
         data.groupby("preset"),
@@ -1783,8 +1790,6 @@ def plot_num_turns():
         lambda df: df["num_turns"],
     )
 
-
-plot_num_turns()
 
 # %% Number of turns (excluding turns after an equivalence claim is made)
 
@@ -1796,6 +1801,7 @@ plot_num_turns()
 # one run, where the first response was invalid and the second response was an equivalence claim.
 
 
+@block
 def plot_num_turns_before_equivalence_claim():
     plot_violin_per_group(
         data.groupby("preset"),
@@ -1805,15 +1811,13 @@ def plot_num_turns_before_equivalence_claim():
     )
 
 
-plot_num_turns_before_equivalence_claim()
-
-
 # %% Number of completions (excluding completions after an equivalence claim is made)
 
 # The number of all messages generated by the LLM.
 # This includes invalid responses and equivalence claims.
 
 
+@block
 def plot_num_completions():
     plot_violin_per_group(
         data.groupby("preset"),
@@ -1823,15 +1827,13 @@ def plot_num_completions():
     )
 
 
-plot_num_completions()
-
-
 # %% Number of completions
 
 # The number of all messages generated by the LLM.
 # This includes invalid responses and equivalence claims.
 
 
+@block
 def plot_num_completions_before_equivalence_claim():
     plot_violin_per_group(
         data.groupby("preset"),
@@ -1841,11 +1843,10 @@ def plot_num_completions_before_equivalence_claim():
     )
 
 
-plot_num_completions_before_equivalence_claim()
-
 # %% Number of turns per outcome
 
 
+@block
 def plot_num_turns_per_outcome():
     preset_data = data.groupby("preset")
 
@@ -1859,12 +1860,10 @@ def plot_num_turns_per_outcome():
         )
 
 
-plot_num_turns_per_outcome()
-
-
 # %% Number of turns per outcome (excluding turns after an equivalence claim is made)
 
 
+@block
 def plot_num_turns_before_equivalence_claim_per_outcome():
     preset_data = data.groupby("preset")
 
@@ -1878,11 +1877,10 @@ def plot_num_turns_before_equivalence_claim_per_outcome():
         )
 
 
-plot_num_turns_before_equivalence_claim_per_outcome()
-
 # %% Number of completions
 
 
+@block
 def plot_num_completions_per_outcome():
     preset_data = data.groupby("preset")
 
@@ -1896,11 +1894,10 @@ def plot_num_completions_per_outcome():
         )
 
 
-plot_num_completions_per_outcome()
-
 # %% Number of completions
 
 
+@block
 def plot_num_completions_before_equivalence_claim_per_outcome():
     preset_data = data.groupby("preset")
 
@@ -1914,13 +1911,11 @@ def plot_num_completions_before_equivalence_claim_per_outcome():
         )
 
 
-plot_num_completions_before_equivalence_claim_per_outcome()
-
 # %% Paper RQ 2: How do resulting test suites compare?
 # ======================================================================================================================
 
 
-class RQ2:  # make this easy to see in the outline panel
+class RQ_2:  # mark this in the outline
     pass
 
 
@@ -1928,7 +1923,7 @@ class RQ2:  # make this easy to see in the outline panel
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MutationScore:  # make this easy to see in the outline panel
+class Mutation_Score:  # mark this in the outline
     pass
 
 
@@ -1938,6 +1933,7 @@ class MutationScore:  # make this easy to see in the outline panel
 # TODO: read total coverage data
 
 
+@block
 def plot_mean_branch_coverage():
     plot_bar_per_group(
         data.groupby("preset"),
@@ -1956,12 +1952,10 @@ def plot_mean_branch_coverage():
     )
 
 
-plot_mean_branch_coverage()
-
-
 # %% Plot mean mutation scores
 
 
+@block
 def plot_mean_mutation_scores():
     plot_bar_per_group(
         data.groupby("preset"),
@@ -1971,9 +1965,6 @@ def plot_mean_mutation_scores():
         ],
         customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
     )
-
-
-plot_mean_mutation_scores()
 
 
 # %% sandbox 1
