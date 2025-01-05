@@ -1,4 +1,40 @@
+# %% Docs
+
+"""
+Dataframes:
+
+- data
+    - Contains the results from running guut on 10 EMSE projects.
+    - Each row contains the result of one "loop" on one mutant.
+    - Indexed by ("preset", "mutant_id") = ("preset", "project", "target_path", "mutant_op", "occurrence")
+    - Available columns: search for "data_columns"
+
+- pynguin_data
+    - Contains the cosmic-ray results from running the Pynguin-generated tests on 10 EMSE projects.
+    - Each row contains the result of running cosmic-ray with the generated test suite on one mutant.
+    - Indexed by ("index", "mutant_id") = ("index", "project", "target_path", "mutant_op", "occurrence")
+    - Available columns: TODO
+
+- aggregated_pynguin_data
+    - TODO: can this be replaced with a simple groupby?
+
+
+Maps:
+
+- coverage_map
+    - Contains the coverage of the LLM-generated test suites each EMSE project.
+    - Each entry contains the coverage for an entire test suite for one project.
+    - Indexed by ("preset", "project").
+
+- pynguin_coverage_map
+    - Contains the coverage of the Pynguin-generated test suites each EMSE project.
+    - Each entry contains the coverage for an entire test suite for one project.
+    - Indexed by ("project", "index") where 1 <= index <= 30.
+"""
+
+
 # %% Imports and constants
+# ======================================================================================================================
 
 import json
 import os
@@ -63,7 +99,7 @@ class LongId(NamedTuple):
 
     @staticmethod
     def parse(long_id: str) -> "LongId":
-        parts = results_dir.name.split("_")
+        parts = long_id.split("_")
         preset = "_".join(parts[:3])
         package = "_".join(parts[3:-1])
         project = package_to_project[package]
@@ -75,7 +111,7 @@ class LongId(NamedTuple):
 # ======================================================================================================================
 
 
-# %% Define some constants and helpers
+# %% Define constants for presets
 
 PRESETS = [
     "baseline_without_iterations",
@@ -93,9 +129,6 @@ PRESET_NAMES = [
 
 
 # %% Load json result files
-
-if "data" in locals():
-    raise Exception("data is already in memory. Refusing to read the files again.")
 
 
 def prepare_loop_result(loop_result: JsonObj):
@@ -146,7 +179,7 @@ def prepare_loop_result(loop_result: JsonObj):
                 exec_result["output"] = exec_result["output"][:5000]
 
 
-def read_result_full(path: Path) -> JsonObj:
+def read_single_result(path: Path) -> JsonObj:
     with path.open("r") as f:
         result = json.load(f)
     prepare_loop_result(result)
@@ -154,19 +187,27 @@ def read_result_full(path: Path) -> JsonObj:
     return result
 
 
-results_paths = list(RESULTS_DIR.glob("*/loops/*/result.json"))
-with Pool(8) as pool:
-    results_json = list(
-        tqdm(
-            pool.imap_unordered(read_result_full, results_paths, chunksize=100),
-            total=len(results_paths),
-            desc="Loading tons of json files",
-        )
-    )
+def read_data():
+    results_paths = list(RESULTS_DIR.glob("*/loops/*/result.json"))
 
-data = pd.json_normalize(results_json)
-data = data.sort_values(by=["long_id", "problem.target_path", "problem.mutant_op", "problem.occurrence"])
-del results_json
+    with Pool(8) as pool:
+        results_json = list(
+            tqdm(
+                pool.imap_unordered(read_single_result, results_paths, chunksize=100),
+                total=len(results_paths),
+                desc="Loading tons of json files",
+            )
+        )
+
+    data = pd.json_normalize(results_json)
+    data = data.sort_values(by=["long_id", "problem.target_path", "problem.mutant_op", "problem.occurrence"])
+    return data
+
+
+if "data" not in locals():
+    data = read_data()
+else:
+    raise Exception("data is already in memory. Refusing to read the files again.")
 
 
 # %% Add project name to data
@@ -211,19 +252,22 @@ class MutantId(NamedTuple):
     mutant_op: str
     occurrence: int
 
+    @staticmethod
+    def from_row(row):
+        return MutantId(
+            project=row["project"],
+            target_path=row["problem.target_path"],
+            mutant_op=row["problem.mutant_op"],
+            occurrence=row["problem.occurrence"],
+        )
 
-def mutant_id_from_row(row):
-    return MutantId(
-        project=row["project"],
-        target_path=row["problem.target_path"],
-        mutant_op=row["problem.mutant_op"],
-        occurrence=row["problem.occurrence"],
-    )
 
-
-data["mutant_id"] = data.apply(mutant_id_from_row, axis=1)
+data["mutant_id"] = data.apply(MutantId.from_row, axis=1)
 
 # %% Compute outcome for simplicity
+
+# TODO: There are also some runs that claimed the mutant is equivalent and then killed the mutant.
+# These either need to be handled differently of this needs to be explained in the paper/thesis.
 
 
 SUCCESS = "success"
@@ -234,16 +278,17 @@ OUTCOMES = [SUCCESS, EQUIVALENT, FAIL]
 OUTCOME_NAMES = ["Success", "Claimed Equivalent", "Failed"]
 
 
-def get_outcome(row):
-    if row["mutant_killed"]:
-        return SUCCESS
-    elif row["claimed_equivalent"]:
-        return EQUIVALENT
-    else:
-        return FAIL
+@block
+def add_outcome_to_data():
+    def get_outcome(row):
+        if row["mutant_killed"]:
+            return SUCCESS
+        elif row["claimed_equivalent"]:
+            return EQUIVALENT
+        else:
+            return FAIL
 
-
-data["outcome"] = data.apply(get_outcome, axis=1).to_frame(name="outcome")
+    data["outcome"] = data.apply(get_outcome, axis=1).to_frame(name="outcome")
 
 
 # %% Make preset easier to type
@@ -270,24 +315,23 @@ def read_mutant_lines(mutants_file: Path, project: str) -> Dict[MutantId, Tuple[
     return {MutantId(project, m[0], m[1], m[2]): (m[3], m[4]) for m in mutants}
 
 
-mutant_lines = {}
-for project in data["project"].unique():
-    mutant_lines.update(read_mutant_lines(MUTANTS_DIR / f"{project}.sqlite", project))
+@block
+def add_mutant_lines_to_data():
+    mutant_lines = {}
+    for project in data["project"].unique():
+        mutant_lines.update(read_mutant_lines(MUTANTS_DIR / f"{project}.sqlite", project))
 
-data["mutant_lines"] = data["mutant_id"].map(mutant_lines.get)
-data["mutant_lines.start"] = data["mutant_lines"].map(lambda t: t[0])
-data["mutant_lines.end"] = data["mutant_lines"].map(lambda t: t[1])
-del mutant_lines
+    data["mutant_lines"] = data["mutant_id"].map(mutant_lines.get)
+    data["mutant_lines.start"] = data["mutant_lines"].map(lambda t: t[0])
+    data["mutant_lines.end"] = data["mutant_lines"].map(lambda t: t[1])
 
-# %% Read coverage info
+
+# %% Read combined coverage info (coverage of all (non-flaky) tests from a project)
 
 # coverage.py only counts lines or branches as missing if the containing module was at least loaded (TODO: confirm).
 # This could lead to a different number of total branches between the measurements. The coverage measures can however
 # still easily be compared by dividing the number of hit lines/branches by the number of the union of all recorded
 # lines/branches. This means that the coverage might still be off compared to the "true" coverage containing all lines # and branches in the project, but all coverage measurements will be equally off.
-
-
-coverage_map = {}
 
 
 class LineId(NamedTuple):
@@ -308,12 +352,12 @@ class Coverage(NamedTuple):
     executed_branches: List[BranchId]
 
 
-def read_coverage(coverage_json: JsonObj):
+def read_coverage_py_json(coverage_json: JsonObj) -> Coverage:
     missing_lines = []
     executed_lines = []
     missing_branches = []
     executed_branches = []
-    for file_name, file in coverage_json["files"]:
+    for file_name, file in coverage_json["files"].items():
         # missing_lines += [f"{file_name}::{line}" for line in file["missing_lines"]]
         # executed_lines += [f"{file_name}::{line}" for line in file["executed_lines"]]
         # missing_branches += [f"{file_name}::{branch}" for branch in file["missing_branches"]]
@@ -325,12 +369,34 @@ def read_coverage(coverage_json: JsonObj):
     return Coverage(missing_lines, executed_lines, missing_branches, executed_branches)
 
 
-for coverage_path in RESULTS_DIR.glob("*/coverage/coverage.json"):
-    results_dir = (coverage_path / ".." / "..").resolve()
-    id = LongId.parse(results_dir.name)
-    with coverage_path.open("r") as f:
-        coverage_json = json.load(f)
-    coverage_map[(id.project, id.preset)] = read_coverage(coverage_json)
+def read_combined_coverage():
+    coverage_map = {}
+    for coverage_path in RESULTS_DIR.glob("*/coverage/coverage.json"):
+        results_dir = (coverage_path / ".." / "..").resolve()
+        id = LongId.parse(results_dir.name)
+        with coverage_path.open("r") as f:
+            coverage_json = json.load(f)
+        coverage_map[(id.preset, id.project)] = read_coverage_py_json(coverage_json)
+    return coverage_map
+
+
+coverage_map = read_combined_coverage()
+
+
+def read_pynguin_combined_coverage():
+    coverage_map = {}
+    for coverage_path in PYNGUIN_TESTS_DIR.glob("*/*/coverage/coverage.json"):
+        project = coverage_path.parent.parent.parent.name
+        index = coverage_path.parent.parent.name
+        with coverage_path.open("r") as f:
+            coverage_json = json.load(f)
+        coverage_map[(project, index)] = read_coverage_py_json(coverage_json)
+    return coverage_map
+
+
+pynguin_coverage_map = read_pynguin_combined_coverage()
+
+# TODO: create union of missed lines / branches so coverage can be compared
 
 
 # %% Add cosmic-ray results
@@ -386,31 +452,31 @@ for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
 
 
 data["cosmic_ray.killed_by_own"] = data.apply(
-    lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][mutant_id_from_row(row)].killed,
+    lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][MutantId.from_row(row)].killed,
     axis=1,
 )
 presets = list(data["preset"].unique())
 data["cosmic_ray.killed_by_any"] = data.apply(
     lambda row: any(
-        cosmic_ray_results[(row["project"], preset, "exitfirst")][mutant_id_from_row(row)].killed for preset in presets
+        cosmic_ray_results[(row["project"], preset, "exitfirst")][MutantId.from_row(row)].killed for preset in presets
     ),
     axis=1,
 )
 
 data["cosmic_ray_full.killed_by_own"] = data.apply(
-    lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].killed,
+    lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][MutantId.from_row(row)].killed,
     axis=1,
 )
 presets = list(data["preset"].unique())
 data["cosmic_ray_full.killed_by_any"] = data.apply(
     lambda row: any(
-        cosmic_ray_results[(row["project"], preset, "full")][mutant_id_from_row(row)].killed for preset in presets
+        cosmic_ray_results[(row["project"], preset, "full")][MutantId.from_row(row)].killed for preset in presets
     ),
     axis=1,
 )
 data["cosmic_ray_full.failing_tests"] = data.apply(
     lambda row: get_failing_tests_for_output(
-        cosmic_ray_results[(row["project"], row["preset"], "full")][mutant_id_from_row(row)].output
+        cosmic_ray_results[(row["project"], row["preset"], "full")][MutantId.from_row(row)].output
     ),
     axis=1,
 )
@@ -526,14 +592,14 @@ class EquivalenceClaim(NamedTuple):
 
 equivalence_claims = {}
 for index, row in data.iterrows():
-    mutant_id = mutant_id_from_row(row)
+    mutant_id = MutantId.from_row(row)
     equivalence_claims[mutant_id] = equivalence_claims.get(mutant_id, []) + (
         [EquivalenceClaim(str(row["preset"]), str(row["id"]))] if bool(row["claimed_equivalent"]) else []
     )
 
 presets = list(data["preset"].unique())
 data["mutant.equivalence_claims"] = data.apply(
-    lambda row: equivalence_claims[mutant_id_from_row(row)],
+    lambda row: equivalence_claims[MutantId.from_row(row)],
     axis=1,
 )
 data["mutant.num_equivalence_claims"] = data["mutant.equivalence_claims"].map(len)
@@ -909,7 +975,7 @@ with open("/proc/self/status") as f:
     memusage = f.read().split("VmRSS:")[1].split("\n")[0][:-3]
     print(f"Memory used: {int(memusage.strip()) / (1024**2):.3f} GB")
 
-# %% Print available columns
+# %% Print available columns (data_columns)
 
 cols = list(data.columns)
 mid = int(((len(cols) + 1) // 2))
@@ -920,7 +986,7 @@ for x, y in zip(cols[:mid] + [""], cols[mid:] + [""]):
 # ======================================================================================================================
 
 
-class MiscPlotsAndData:  # mark this in the outline
+class ____Misc_Plots_And_Data:  # mark this in the outline
     pass
 
 
@@ -1522,7 +1588,7 @@ for n in target_data["mutant.num_equivalence_claims"].unique():
 # ======================================================================================================================
 
 
-class Plot_Helpers:  # mark this in the outline
+class ____Plot_Helpers:  # mark this in the outline
     pass
 
 
@@ -1577,7 +1643,7 @@ def plot_violin_per_group(
 # ======================================================================================================================
 
 
-class Shelved_Plots_And_Data:  # mark this in the outline
+class ____Shelved_Plots_And_Data:  # mark this in the outline
     pass
 
 
@@ -1643,7 +1709,7 @@ plot_percentage_of_direct_kills()
 # ======================================================================================================================
 
 
-class RQ_1:  # mark this in the outline
+class ____RQ_1:  # mark this in the outline
     pass
 
 
@@ -1651,7 +1717,7 @@ class RQ_1:  # mark this in the outline
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Usage:  # mark this in the outline
+class ____Usage:  # mark this in the outline
     pass
 
 
@@ -1749,7 +1815,7 @@ def plot_cost_per_mutant():
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Success_Rate:  # mark this in the outline
+class ____Success_Rate:  # mark this in the outline
     pass
 
 
@@ -1774,7 +1840,7 @@ def plot_outcomes():
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Number_Of_Turns:  # mark this in the outline
+class ____Number_Of_Turns:  # mark this in the outline
     pass
 
 
@@ -1915,7 +1981,7 @@ def plot_num_completions_before_equivalence_claim_per_outcome():
 # ======================================================================================================================
 
 
-class RQ_2:  # mark this in the outline
+class ____RQ_2:  # mark this in the outline
     pass
 
 
@@ -1923,31 +1989,32 @@ class RQ_2:  # mark this in the outline
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Mutation_Score:  # mark this in the outline
+class ____Mutation_Score:  # mark this in the outline
     pass
 
 
 # %% Plot mean branch coverage
 
-# TODO: this only calculates the coverage for the CUT in one run
-# TODO: read total coverage data
-
 
 @block
 def plot_mean_branch_coverage():
+    def get_coverage_for_group(df):
+        preset = df["preset"].unique()[0]
+        projects = df["project"].unique()
+
+        coverage_values = [coverage_map[(preset, project)] for project in projects]
+        executed_lines = set()
+        all_lines = set()
+        for c in coverage_values:
+            executed_lines.update(c.executed_lines)
+            all_lines.update(c.executed_lines)
+            all_lines.update(c.missing_lines)
+        return len(executed_lines) / len(all_lines)
+
     plot_bar_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
-        [
-            (
-                "Mutation Score",
-                lambda df: (
-                    df["coverage.covered_branches"].map(len)
-                    / (df["coverage.covered_branches"].map(len) + df["coverage.missing_branches"].map(len))
-                ).sum()
-                / len(df),
-            ),
-        ],
+        [("Line coverage", get_coverage_for_group)],
         customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
     )
 
@@ -1960,9 +2027,7 @@ def plot_mean_mutation_scores():
     plot_bar_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
-        [
-            ("Mutation Score", lambda df: df["cosmic_ray.killed_by_own"].sum() / len(df)),
-        ],
+        [("Mutation Score", lambda df: df["cosmic_ray.killed_by_own"].sum() / len(df))],
         customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
     )
 
@@ -1975,3 +2040,18 @@ group_data["usage.prompt_tokens"].mean().sum()
 
 # %% sandbox 2
 print(data[(data["num_turns"] < 3) & (data["outcome"] == FAIL)][["preset", "id"]].to_string())
+
+# %%
+coverage_map[("debugging_zero_shot", "apimd")].executed_branches
+
+# %%
+[
+    (preset, project, len(c.executed_branches) / (len(c.executed_branches) + len(c.missing_branches)))
+    for (preset, project), c in coverage_map.items()
+]
+
+# %%
+[
+    (preset, project, len(c.executed_branches) / (len(c.executed_branches) + len(c.missing_branches)))
+    for (preset, project), c in pynguin_coverage_map.items()
+]
