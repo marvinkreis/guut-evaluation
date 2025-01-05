@@ -16,7 +16,9 @@ source "/guut/.venv/bin/activate"
 src_path="$(python -c "import json; paths=json.load(open('/emse_projects/scripts/src_paths.json')); print(paths['$project_name'])")"
 full_module_path="/emse_projects/code/${project_name}/${src_path}"
 
-cd "${full_module_path}/.."
+cd "${full_module_path}"
+module_name=$(basename "$PWD")
+cd ..
 
 cat << EOF > .coveragerc
 [run]
@@ -25,14 +27,15 @@ branch = True
 include = $(basename "${full_module_path}")/*
 EOF
 
-source "/emse_projects/venvs/${project_name}/bin/activate"
-python -m coverage run --concurrency=multiprocessing /cosmic-ray/run_pytest_tests.py test "${result_dir}/cosmic-ray/failing_tests.json" "${result_dir}/tests/"*.py
+source "/emse_projects/pynguin_venvs/${project_name}/bin/activate"
+python /cosmic-ray/run_pytest_tests.py test --cov="${module_name}" "${result_dir}/cosmic-ray/failing_tests.json" "${result_dir}/tests/"*.py
 
 if [[ ! -d "${result_dir}/coverage" ]]; then
     mkdir "${result_dir}/coverage"
 fi
 
-coverage combine
+coverage combine || true
 coverage json
 mv coverage.json "${result_dir}/coverage/coverage.json"
 coverage report -i > "${result_dir}/coverage/coverage.txt"
+rm .coverage

@@ -32,7 +32,8 @@ if [[ ! -d "${result_dir}/coverage" ]]; then
     mkdir "${result_dir}/coverage"
 fi
 
-coverage combine
+coverage combine || true
 coverage json
 mv coverage.json "${result_dir}/coverage/coverage.json"
 coverage report > "${result_dir}/coverage/coverage.txt"
+rm .coverage

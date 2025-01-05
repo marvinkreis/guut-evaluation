@@ -69,9 +69,10 @@ def run_tests_inner(tests: List[Path], conn):
             import pytest
 
             try:
-                exit_code = pytest.main(
-                    ["--timeout=5", "--timeout-method=signal", "--capture=no"] + [str(test) for test in tests]
-                )
+                args = ["--timeout=5", "--timeout-method=signal", "--capture=no"]
+                if coverage_arg:
+                    args += [coverage_arg]
+                exit_code = pytest.main(args + [str(test) for test in tests])
                 conn.send(TestResult(failed=(exit_code != 0), stdout=out.getvalue(), stderr=err.getvalue()))
             except Exception:
                 conn.send(TestResult(failed=True, stdout=out.getvalue(), stderr=err.getvalue()))
@@ -120,9 +121,17 @@ def run_tests(tests: List[Path]):
 
 
 # Read arguments
-command = sys.argv[1]  # "baseline" or "test"
-exclude_file = Path(sys.argv[2])  # path to "exclude.json" file
-tests = [Path(path) for path in sys.argv[3:] if not path.endswith("__pycache__")]  # paths to test files
+argv = sys.argv
+coverage_arg = None
+for arg in argv:
+    if arg.startswith("--cov"):
+        coverage_arg = arg
+        break
+argv = [arg for arg in argv if not arg.startswith("--cov")]
+
+command = argv[1]  # "baseline" or "test"
+exclude_file = Path(argv[2])  # path to "exclude.json" file
+tests = [Path(path) for path in argv[3:] if not path.endswith("__pycache__")]  # paths to test files
 
 if command not in ["baseline", "test"]:
     print(f"Invalid command: {command}", file=sys.stderr)
