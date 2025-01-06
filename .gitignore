@@ -9,3 +9,4 @@ __pycache__
 /guut_emse_logs.tar.xz
 /emse_projects_data/venvs/
 /emse_projects_data/pynguin_venvs/
+/*.bak*
