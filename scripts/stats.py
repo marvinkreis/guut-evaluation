@@ -45,11 +45,13 @@ from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, Callable
+from scipy.stats import mannwhitneyu
 
 import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
 from matplotlib import colormaps as cm
+from matplotlib.figure import Figure
 from tqdm import tqdm
 
 pd.set_option("display.width", None)
@@ -85,7 +87,51 @@ MUTANTS_DIR = REPO_PATH / "emse_projects_data" / "mutants_sampled"
 
 
 def block(function):
-    function()
+    return function()
+
+
+# %% Decorator to save plots
+
+
+def savefig(function):
+    def outer_function():
+        retval = function()
+
+        if isinstance(retval, Figure):
+            fig = retval
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.png")
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf")
+
+        if isinstance(retval, list):
+            for index, entry in enumerate(retval):
+                fig = entry
+                fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
+                fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
+
+    return outer_function
+
+
+# %% Excluded Pynguin runs
+
+
+def is_pynguin_run_excluded(project, index):
+    index = int(index)
+    if project == "pdir2":  # Breaks Pynguin, because pdir2 replaces its own module with a function.
+        return True
+    if (project, index) in [
+        ("flutils", 6),  # Tests delete the package under test.
+        ("flutils", 9),  # Tests delete the package under test.
+        ("flutils", 10),  # Breaks coverage.py.
+        ("flutils", 20),  # Breaks coverage.py.
+        ("flake8", 4),  # Tests cause pytest to raise an OSError. Most mutants are killed even though the tests pass.
+        ("apimd", 24),  # Missing in the results.
+    ]:
+        return True
+    return False
+
+
+def is_pynguin_project_excluded(project):
+    return project == "pdir2"
 
 
 # %% Parse info from the results directory name
@@ -125,6 +171,19 @@ PRESET_NAMES = [
     "Baseline w/ iterations",
     "Scientific Debugging (0-shot)",
     "Scientific Debugging (1-shot)",
+]
+
+PROJECTS = [
+    "apimd",
+    "codetiming",
+    "dataclasses-json",
+    "docstring_parser",
+    "flake8",
+    "flutes",
+    "flutils",
+    "httpie",
+    "pdir2",
+    "python-string-utils",
 ]
 
 
@@ -370,33 +429,64 @@ def read_coverage_py_json(coverage_json: JsonObj) -> Coverage:
 
 
 def read_combined_coverage():
-    coverage_map = {}
+    map = {}
     for coverage_path in RESULTS_DIR.glob("*/coverage/coverage.json"):
         results_dir = (coverage_path / ".." / "..").resolve()
         id = LongId.parse(results_dir.name)
         with coverage_path.open("r") as f:
             coverage_json = json.load(f)
-        coverage_map[(id.preset, id.project)] = read_coverage_py_json(coverage_json)
-    return coverage_map
+        map[(id.preset, id.project)] = read_coverage_py_json(coverage_json)
+    return map
 
 
-coverage_map = read_combined_coverage()
+coverage_map: Dict[Tuple[str, str], Coverage] = read_combined_coverage()
 
 
 def read_pynguin_combined_coverage():
-    coverage_map = {}
+    map = {}
     for coverage_path in PYNGUIN_TESTS_DIR.glob("*/*/coverage/coverage.json"):
         project = coverage_path.parent.parent.parent.name
         index = coverage_path.parent.parent.name
+        if is_pynguin_run_excluded(project, index):
+            continue
         with coverage_path.open("r") as f:
             coverage_json = json.load(f)
-        coverage_map[(project, index)] = read_coverage_py_json(coverage_json)
-    return coverage_map
+        map[(project, int(index))] = read_coverage_py_json(coverage_json)
+    return map
 
 
-pynguin_coverage_map = read_pynguin_combined_coverage()
+pynguin_coverage_map: Dict[Tuple[str, int], Coverage] = read_pynguin_combined_coverage()
 
-# TODO: create union of missed lines / branches so coverage can be compared
+
+def sum_code_elements():
+    lines_map = {}
+    branches_map = {}
+
+    for project in data["project"].unique():
+        lines = set()
+        branches = set()
+
+        for preset in PRESETS:
+            lines.update(coverage_map[(preset, project)].executed_lines)
+            lines.update(coverage_map[(preset, project)].missing_lines)
+            branches.update(coverage_map[(preset, project)].executed_branches)
+            branches.update(coverage_map[(preset, project)].missing_branches)
+
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+            lines.update(pynguin_coverage_map[(project, index)].executed_lines)
+            lines.update(pynguin_coverage_map[(project, index)].missing_lines)
+            branches.update(pynguin_coverage_map[(project, index)].executed_branches)
+            branches.update(pynguin_coverage_map[(project, index)].missing_branches)
+
+        lines_map[project] = lines
+        branches_map[project] = branches
+
+    return lines_map, branches_map
+
+
+all_seen_lines_map, all_seen_branches_map = sum_code_elements()
 
 
 # %% Add cosmic-ray results
@@ -498,8 +588,7 @@ pynguin_data = dict(project=[], index=[], mutant_id=[], killed=[], failing_tests
 for mutants_path in PYNGUIN_TESTS_DIR.glob("*/*/cosmic-ray/mutants.sqlite"):
     project = mutants_path.parent.parent.parent.name
     index = mutants_path.parent.parent.name
-    if (project, index) in [("flutils", "06"), ("flutils", "09"), ("flake8", "04")]:
-        "skip for now, due to errors"
+    if is_pynguin_run_excluded(project, index):
         continue
     results = read_mutant_results(mutants_path, project)
     for mutant_id, cosmic_ray_info in results.items():
@@ -513,7 +602,7 @@ pynguin_data = pd.DataFrame(pynguin_data)
 
 # %% Sum up Pynguin results
 
-Project = str
+type Project = str
 
 
 class PynguinCosmicRayRunSummary(NamedTuple):
@@ -526,8 +615,7 @@ aggregated_pynguin_data = dict(project=[], index=[], killed=[])
 for project in pynguin_data["project"].unique():
     for index in range(30):
         index += 1
-        if (project, index) in [("flutils", "06"), ("flutils", "09"), ("flake8", "04")]:
-            "skip for now, due to errors"
+        if is_pynguin_run_excluded(project, index):
             continue
         target_data = (
             pynguin_data
@@ -715,6 +803,9 @@ del num_mutants
 
 
 # %% Get number of coverable lines and branches per file
+
+# TODO: This doesn't include Pynguin's data
+# TODO: Is this still relevant?
 
 all_lines = {}
 all_line_ids = {}
@@ -1569,7 +1660,7 @@ data[data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].
 # %% Overview over sampled mutants
 
 target_data = data[data["preset"] == "debugging_one_shot"]
-for n in target_data["mutant.num_equivalence_claims"].unique():
+for n in target_data["mutant.num_equivalence_claims"].unique():  # pyright: ignore
     print(
         f"claims: {n}, equivalent: yes -> {len(target_data[target_data["sampled"] & (target_data["sample.equivalent"] == True) & (target_data["mutant.num_equivalence_claims"] == n)])}"
     )
@@ -1618,6 +1709,30 @@ def plot_bar_per_group(
     if customization:
         customization(fig, ax)
 
+    return fig
+
+
+def plot_box_per_group(
+    grouped_data: Any,
+    groups: List[Tuple[str, str]],
+    col_name: str,
+    col_fun: Callable[[Any], Any],
+    customization: Callable[[Any, Any], None] | None = None,
+):
+    values = [query_group(grouped_data, group_key, col_fun, 0) for group_key, group_name in groups]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.boxplot(values)
+
+    ax.set_xticks(np.arange(len(groups)) + 1)
+    ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
+    fig.legend([col_name], loc="lower right")
+
+    if customization:
+        customization(fig, ax)
+
+    return fig
+
 
 def plot_violin_per_group(
     grouped_data: Any,
@@ -1638,6 +1753,8 @@ def plot_violin_per_group(
     if customization:
         customization(fig, ax)
 
+    return fig
+
 
 # %% Shelved Plots and Data
 # ======================================================================================================================
@@ -1650,6 +1767,8 @@ class ____Shelved_Plots_And_Data:  # mark this in the outline
 # %% Plot percentage of direct kills
 
 
+@block
+@savefig
 def plot_percentage_of_direct_kills():
     ticks = []
     percentages = []  # [direct kill, kill with tests from same run, kill with any tests]
@@ -1698,14 +1817,8 @@ def plot_percentage_of_direct_kills():
     )
     plt.show()
 
-    del ticks
-    del percentages
 
-
-plot_percentage_of_direct_kills()
-
-
-# %% Paper RQ 1: How do our LLM-based approaches differ?
+# %% Paper RQ 1: How does our approach perform compared to Pynguin?
 # ======================================================================================================================
 
 
@@ -1745,8 +1858,11 @@ data[token_cols].sum()
 
 # %% Plot mean cost per preset and project
 
+save_figs = True
+
 
 @block
+@savefig
 def plot_mean_cost_2d():
     projects = sorted(list(data["project"].unique()))
     plot_data = data.groupby(["preset", "project"])
@@ -1776,15 +1892,16 @@ def plot_mean_cost_2d():
     ax.set_xticks(range(10))
     ax.set_xticklabels(projects, rotation=90)
 
-    fig.show()
+    return fig
 
 
 # %% Plot mean number of tokens for one mutant
 
 
 @block
+@savefig
 def plot_num_tokens_per_mutant():
-    plot_bar_per_group(
+    return plot_bar_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         [
@@ -1799,8 +1916,9 @@ def plot_num_tokens_per_mutant():
 
 
 @block
+@savefig
 def plot_cost_per_mutant():
-    plot_bar_per_group(
+    return plot_bar_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         [
@@ -1823,8 +1941,9 @@ class ____Success_Rate:  # mark this in the outline
 
 
 @block
+@savefig
 def plot_outcomes():
-    plot_bar_per_group(
+    return plot_bar_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         [
@@ -1834,6 +1953,190 @@ def plot_outcomes():
         ],
         customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
     )
+
+
+# %% Coverage
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ____Coverage:  # mark this in the outline
+    pass
+
+
+# %% Plot mean line coverage
+
+
+@block
+@savefig
+def plot_mean_line_coverage():
+    def get_coverage_for_group(df):
+        preset = df["preset"].unique()[0]
+        projects = df["project"].unique()
+
+        coverage_values = [coverage_map[(preset, project)] for project in projects]
+        executed_lines = set()
+        for c in coverage_values:
+            executed_lines.update(c.executed_lines)
+        return len(executed_lines) / sum([len(lines) for lines in all_seen_lines_map.values()])
+
+    return plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [("Line coverage", get_coverage_for_group)],
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.0f}%"),
+    )
+
+
+# %% Plot mean branch coverage
+
+
+@block
+@savefig
+def plot_mean_branch_coverage():
+    def get_coverage_for_group(df):
+        preset = df["preset"].unique()[0]
+        projects = df["project"].unique()
+
+        coverage_values = [coverage_map[(preset, project)] for project in projects]
+        executed_branches = set()
+        for c in coverage_values:
+            executed_branches.update(c.executed_branches)
+        return len(executed_branches) / sum([len(branches) for branches in all_seen_branches_map.values()])
+
+    return plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [("Line coverage", get_coverage_for_group)],
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.0f}%"),
+    )
+
+
+# %% Plot mean line coverage with best Pynguin run
+
+
+@block
+@savefig
+def plot_mean_line_coverage_with_pynguin():
+    values = []
+    for preset in PRESETS:
+        num_covered = 0
+        for project in PROJECTS:
+            num_covered += len(coverage_map[(preset, project)].executed_lines)
+        values.append(num_covered)
+
+    num_pynguin_covered = 0
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        best_index = best_pynguin_runs[project].index_
+        num_pynguin_covered += len(pynguin_coverage_map[(project, best_index)].executed_lines)
+    values.append(num_pynguin_covered)
+
+    values = np.array(values) / sum([len(branches) for branches in all_seen_lines_map.values()])
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.bar(x=np.arange(5), height=values)
+
+    ax.set_xticks(np.arange(5))
+    ax.set_xticklabels(PRESET_NAMES + ["Pynguin"], rotation=90)
+
+    return fig
+
+
+# %% Plot mean branch coverage with best Pynguin run
+
+
+@block
+@savefig
+def plot_mean_branch_coverage_with_pynguin():
+    values = []
+    for preset in PRESETS:
+        num_covered = 0
+        for project in PROJECTS:
+            num_covered += len(coverage_map[(preset, project)].executed_branches)
+        values.append(num_covered)
+
+    num_pynguin_covered = 0
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        best_index = best_pynguin_runs[project].index_
+        num_pynguin_covered += len(pynguin_coverage_map[(project, best_index)].executed_branches)
+    values.append(num_pynguin_covered)
+
+    values = np.array(values) / sum([len(branches) for branches in all_seen_branches_map.values()])
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.bar(x=np.arange(5), height=values)
+
+    ax.set_xticks(np.arange(5))
+    ax.set_xticklabels(PRESET_NAMES + ["Pynguin"], rotation=90)
+
+    fig.legend(["Branch Coverage"], loc="lower right")
+    return fig
+
+
+# %% Mutation score
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ____Mutation_Score:  # mark this in the outline
+    pass
+
+
+# %% Plot mean mutation scores
+
+
+@block
+@savefig
+def plot_mean_mutation_scores():
+    return plot_bar_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        [("Mutation Score", lambda df: df["cosmic_ray.killed_by_own"].sum() / len(df))],
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.0f}%"),
+    )
+
+
+# %% Plot mean mutation scores with best Pynguin run
+
+
+@block
+@savefig
+def plot_mean_mutation_score_with_pynguin():
+    values = []
+    for preset in PRESETS:
+        group = data[data["preset"] == preset]
+        values.append(group["cosmic_ray.killed_by_own"].sum())
+
+    num_pynguin_killed = 0
+    for project, run in best_pynguin_runs.items():
+        best_run_for_project_data = pynguin_data[
+            (pynguin_data["project"] == project) & (pynguin_data["index"] == run.index_)
+        ]  # pyright: ignore
+        num_pynguin_killed += best_run_for_project_data["killed"].sum()  # pyright: ignore
+    values.append(num_pynguin_killed)
+
+    values = np.array(values) / len(data[data["preset"] == PRESETS[0]])
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.bar(x=np.arange(5), height=values)
+
+    ax.set_xticks(np.arange(5))
+    ax.set_xticklabels(PRESET_NAMES + ["Pynguin"], rotation=90)
+
+    fig.legend(["Branch Coverage"], loc="lower right")
+    return fig
+
+
+# %% Paper RQ 2: Can our approach reliably detect equivalent mutants
+# ======================================================================================================================
+
+
+class ____RQ_2:  # mark this in the outline
+    pass
 
 
 # %% Number of turns / completions
@@ -1848,8 +2151,9 @@ class ____Number_Of_Turns:  # mark this in the outline
 
 
 @block
+@savefig
 def plot_num_turns():
-    plot_violin_per_group(
+    return plot_violin_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         "Number of turns (responses containing runnable code)",
@@ -1868,12 +2172,30 @@ def plot_num_turns():
 
 
 @block
+@savefig
 def plot_num_turns_before_equivalence_claim():
-    plot_violin_per_group(
+    return plot_violin_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         "Number of turns before equivalence claim",
         lambda df: df["num_turns_before_equivalence_claim"],
+    )
+
+
+# %% Number of completions
+
+# The number of all messages generated by the LLM.
+# This includes invalid responses and equivalence claims.
+
+
+@block
+@savefig
+def plot_num_completions():
+    return plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of completions (all LLM-generated responses)",
+        lambda df: df["num_completions"],
     )
 
 
@@ -1884,27 +2206,12 @@ def plot_num_turns_before_equivalence_claim():
 
 
 @block
-def plot_num_completions():
-    plot_violin_per_group(
-        data.groupby("preset"),
-        list(zip(PRESETS, PRESET_NAMES)),
-        "Number of completions",
-        lambda df: df["num_completions"],
-    )
-
-
-# %% Number of completions
-
-# The number of all messages generated by the LLM.
-# This includes invalid responses and equivalence claims.
-
-
-@block
+@savefig
 def plot_num_completions_before_equivalence_claim():
-    plot_violin_per_group(
+    return plot_violin_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
-        "Number of completions",
+        "Number of completions before equivalence claim",
         lambda df: df["num_completions_before_equivalence_claim"],
     )
 
@@ -1913,145 +2220,139 @@ def plot_num_completions_before_equivalence_claim():
 
 
 @block
+@savefig
 def plot_num_turns_per_outcome():
     preset_data = data.groupby("preset")
+    plots = []
 
     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot_violin_per_group(
+        plot = plot_violin_per_group(
             preset_data.get_group(preset).groupby("outcome"),
             list(zip(OUTCOMES, OUTCOME_NAMES)),
             "Number of turns",
             lambda df: df["num_turns"],
             customization=lambda fig, ax: ax.set_title(preset_name),
         )
+        plots.append(plot)
+
+    return plots
 
 
 # %% Number of turns per outcome (excluding turns after an equivalence claim is made)
 
 
 @block
+@savefig
 def plot_num_turns_before_equivalence_claim_per_outcome():
     preset_data = data.groupby("preset")
+    plots = []
 
     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot_violin_per_group(
+        plot = plot_violin_per_group(
             preset_data.get_group(preset).groupby("outcome"),
             list(zip(OUTCOMES, OUTCOME_NAMES)),
             "Number of turns before equivalence claim",
             lambda df: df["num_turns_before_equivalence_claim"],
             customization=lambda fig, ax: ax.set_title(preset_name),
         )
+        plots.append(plot)
+
+    return plots
 
 
 # %% Number of completions
 
 
 @block
+@savefig
 def plot_num_completions_per_outcome():
     preset_data = data.groupby("preset")
+    plots = []
 
     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot_violin_per_group(
+        plot = plot_violin_per_group(
             preset_data.get_group(preset).groupby("outcome"),
             list(zip(OUTCOMES, OUTCOME_NAMES)),
             "Number of completions",
             lambda df: df["num_completions"],
             customization=lambda fig, ax: ax.set_title(preset_name),
         )
+        plots.append(plot)
+
+    return plots
 
 
 # %% Number of completions
 
 
 @block
+@savefig
 def plot_num_completions_before_equivalence_claim_per_outcome():
     preset_data = data.groupby("preset")
+    plots = []
 
     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot_violin_per_group(
+        plot = plot_violin_per_group(
             preset_data.get_group(preset).groupby("outcome"),
             list(zip(OUTCOMES, OUTCOME_NAMES)),
             "Number of completions before equivalence claim",
             lambda df: df["num_completions_before_equivalence_claim"],
             customization=lambda fig, ax: ax.set_title(preset_name),
         )
+        plots.append(plot)
+
+    return plots
 
 
-# %% Paper RQ 2: How do resulting test suites compare?
-# ======================================================================================================================
-
-
-class ____RQ_2:  # mark this in the outline
-    pass
-
-
-# %% Mutation score
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class ____Mutation_Score:  # mark this in the outline
-    pass
-
-
-# %% Plot mean branch coverage
+# %% Mann-Whitney U Test
 
 
 @block
-def plot_mean_branch_coverage():
-    def get_coverage_for_group(df):
-        preset = df["preset"].unique()[0]
-        projects = df["project"].unique()
+def mannwhitneyu_test():
+    grouped_guut_data = data.groupby("preset")
+    guut_groups = {preset: grouped_guut_data.get_group(preset)["cosmic_ray.killed_by_own"] for preset in PRESETS}
 
-        coverage_values = [coverage_map[(preset, project)] for project in projects]
-        executed_lines = set()
-        all_lines = set()
-        for c in coverage_values:
-            executed_lines.update(c.executed_lines)
-            all_lines.update(c.executed_lines)
-            all_lines.update(c.missing_lines)
-        return len(executed_lines) / len(all_lines)
+    grouped_pynguin_data = pynguin_data.groupby("index")  # pyright: ignore
+    pynguin_groups = {index: grouped_pynguin_data.get_group(index)["killed"] for index in range(1, 31)}
 
-    plot_bar_per_group(
-        data.groupby("preset"),
-        list(zip(PRESETS, PRESET_NAMES)),
-        [("Line coverage", get_coverage_for_group)],
-        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
-    )
+    results = {}
+    results["comparison"] = []
+    for preset in PRESETS:
+        results[f"{preset}_statistic"] = []
+        results[f"{preset}_pvalue"] = []
 
+    for group_name_2, values_2 in (guut_groups | pynguin_groups).items():
+        if isinstance(group_name_2, int):
+            group_name_2 = f"pynguin_{group_name_2}"
+        results["comparison"].append(group_name_2)
 
-# %% Plot mean mutation scores
+        for group_name_1, values_1 in guut_groups.items():
+            result = mannwhitneyu(values_1, values_2)
+            results[f"{group_name_1}_statistic"].append(result.statistic)
+            results[f"{group_name_1}_pvalue"].append(result.pvalue)
 
+    df = pd.DataFrame(results)
+    df.to_csv(OUTPUT_PATH / "mannwhitneyu.csv")
 
-@block
-def plot_mean_mutation_scores():
-    plot_bar_per_group(
-        data.groupby("preset"),
-        list(zip(PRESETS, PRESET_NAMES)),
-        [("Mutation Score", lambda df: df["cosmic_ray.killed_by_own"].sum() / len(df))],
-        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
-    )
-
-
-# %% sandbox 1
-plot_data = data.groupby("preset")
-group = plot_data.get_group("debugging_zero_shot")
-group_data = group.groupby("project")
-group_data["usage.prompt_tokens"].mean().sum()
 
 # %% sandbox 2
-print(data[(data["num_turns"] < 3) & (data["outcome"] == FAIL)][["preset", "id"]].to_string())
 
-# %%
-coverage_map[("debugging_zero_shot", "apimd")].executed_branches
+for project in data["project"].unique():
+    lines = [
+        len(coverage_map[(preset, project)].missing_lines) + len(coverage_map[(preset, project)].executed_lines)
+        for preset in PRESETS
+    ]
+    branches = [
+        len(coverage_map[(preset, project)].missing_branches) + len(coverage_map[(preset, project)].executed_branches)
+        for preset in PRESETS
+    ]
+    print(f"{project}: {lines}")
+    print(f"{project}: {branches}")
 
-# %%
-[
-    (preset, project, len(c.executed_branches) / (len(c.executed_branches) + len(c.missing_branches)))
-    for (preset, project), c in coverage_map.items()
-]
+# %% sandbox 3
 
-# %%
-[
-    (preset, project, len(c.executed_branches) / (len(c.executed_branches) + len(c.missing_branches)))
-    for (preset, project), c in pynguin_coverage_map.items()
-]
+pynguin_coverage_map[("apimd", 1)]
+
+# %% sandbox 4
+
+all_seen_lines_map["httpie"]

@@ -8,7 +8,34 @@ pynguin_results_dir = Path(sys.argv[1])
 output_dir = Path(sys.argv[2])
 
 pynguin_results = pd.read_csv(pynguin_results_dir / "results.csv")
-package_to_project = json.loads((Path(sys.argv[0]).parent / "package_to_project.json").read_text())
+package_to_project = {
+    "apimd": "apimd",
+    "black": "black",
+    "blackd": "black",
+    "black_primer": "black",
+    "blib2to3": "black",
+    "_black_version": "black",
+    "codetiming": "codetiming",
+    "dataclasses_json": "dataclasses-json",
+    "docstring_parser": "docstring_parser",
+    "flake8": "flake8",
+    "flutes": "flutes",
+    "flutils": "flutils",
+    "httpie": "httpie",
+    "isort": "isort",
+    "mimesis": "mimesis",
+    "pdir": "pdir2",
+    "py_backwards": "py-backwards",
+    "pymonet": "pyMonet",
+    "pypara": "pypara",
+    "semantic_release": "python-semantic-release",
+    "string_utils": "python-string-utils",
+    "pytutils": "pytutils",
+    "sanic": "sanic",
+    "sty": "sty",
+    "thonny": "thonny",
+    "typesystem": "typesystem",
+}
 
 
 def map_to_project(target_module, seen_unknown_modules=[]):
