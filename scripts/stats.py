@@ -1,38 +1,42 @@
 # %% Docs
 
-"""
-Dataframes:
 
-- data
-    - Contains the results from running guut on 10 EMSE projects.
-    - Each row contains the result of one "loop" on one mutant.
-    - Indexed by ("preset", "mutant_id") = ("preset", "project", "target_path", "mutant_op", "occurrence")
-    - Available columns: search for "data_columns"
-
-- pynguin_data
-    - Contains the cosmic-ray results from running the Pynguin-generated tests on 10 EMSE projects.
-    - Each row contains the result of running cosmic-ray with the generated test suite on one mutant.
-    - Indexed by ("index", "mutant_id") = ("index", "project", "target_path", "mutant_op", "occurrence")
-    - Available columns: TODO
-
-- aggregated_pynguin_data
-    - TODO: can this be replaced with a simple groupby?
-
-- sample_data
-
-
-Maps:
-
-- coverage_map
-    - Contains the coverage of the LLM-generated test suites each EMSE project.
-    - Each entry contains the coverage for an entire test suite for one project.
-    - Indexed by ("preset", "project").
-
-- pynguin_coverage_map
-    - Contains the coverage of the Pynguin-generated test suites each EMSE project.
-    - Each entry contains the coverage for an entire test suite for one project.
-    - Indexed by ("project", "index") where 1 <= index <= 30.
-"""
+# Dataframes:
+#
+# - data
+#     - Contains the results from running guut on 10 EMSE projects.
+#     - Each row contains the result of one "loop" on one mutant.
+#     - Indexed by ("preset", "mutant_id") = ("preset", "project", "target_path", "mutant_op", "occurrence")
+#     - Available columns: search for "data_columns"
+#
+# - pynguin_data
+#     - Contains the cosmic-ray results from running the Pynguin-generated tests on 10 EMSE projects.
+#     - Each row contains the result of running cosmic-ray with the generated test suite on one mutant.
+#     - Indexed by ("index", "mutant_id") = ("index", "project", "target_path", "mutant_op", "occurrence")
+#     - Available columns: TODO
+#
+# - aggregated_pynguin_data
+#     - TODO: can this be replaced with a simple groupby?
+#
+# - sample_data
+#
+#
+# Maps:
+#
+# - coverage_map
+#     - Contains the coverage of the LLM-generated test suites each EMSE project.
+#     - Each entry contains the coverage for an entire test suite for one project.
+#     - Indexed by ("preset", "project").
+#
+# - pynguin_coverage_map
+#     - Contains the coverage of the Pynguin-generated test suites each EMSE project.
+#     - Each entry contains the coverage for an entire test suite for one project.
+#     - Indexed by ("project", "index") where 1 <= index <= 30.
+#
+# - all_seen_lines_map / all_seen_branches_map
+#     - Contains all (executed or missing) lines/branches from coverage.py for each EMSE project.
+#     - Each entry contains a set of lines of one project.
+#     - Indexed by "project"
 
 
 # %% Imports and constants
@@ -47,7 +51,6 @@ from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, Callable
-from scipy.stats import mannwhitneyu
 
 import matplotlib.pylab as plt
 import numpy as np
@@ -67,7 +70,8 @@ OUTPUT_PATH = Path("/tmp/out")
 OUTPUT_PATH.mkdir(exist_ok=True)
 
 
-# %% Find result directory and mutants
+# %% Find result directories
+
 
 if "get_ipython" in locals():
     print("Running as ipython kernel")
@@ -79,6 +83,73 @@ else:
 RESULTS_DIR = REPO_PATH / "guut_emse_results"
 PYNGUIN_TESTS_DIR = REPO_PATH / "pynguin_emse_tests"
 MUTANTS_DIR = REPO_PATH / "emse_projects_data" / "mutants_sampled"
+
+
+# %% Define some constants
+
+
+PRESETS = [
+    "baseline_without_iterations",
+    "baseline_with_iterations",
+    "debugging_zero_shot",
+    "debugging_one_shot",
+]
+
+PRESET_NAMES = [
+    "Baseline w/o iterations",
+    "Baseline w/ iterations",
+    "Scientific Debugging (0-shot)",
+    "Scientific Debugging (1-shot)",
+]
+
+PROJECTS = [
+    "apimd",
+    "codetiming",
+    "dataclasses-json",
+    "docstring_parser",
+    "flake8",
+    "flutes",
+    "flutils",
+    "httpie",
+    "pdir2",
+    "python-string-utils",
+]
+
+PACKAGE_TO_PROJECT = {
+    "apimd": "apimd",
+    "black": "black",
+    "blackd": "black",
+    "black_primer": "black",
+    "blib2to3": "black",
+    "_black_version": "black",
+    "codetiming": "codetiming",
+    "dataclasses_json": "dataclasses-json",
+    "docstring_parser": "docstring_parser",
+    "flake8": "flake8",
+    "flutes": "flutes",
+    "flutils": "flutils",
+    "httpie": "httpie",
+    "isort": "isort",
+    "mimesis": "mimesis",
+    "pdir": "pdir2",
+    "py_backwards": "py-backwards",
+    "pymonet": "pyMonet",
+    "pypara": "pypara",
+    "semantic_release": "python-semantic-release",
+    "string_utils": "python-string-utils",
+    "pytutils": "pytutils",
+    "sanic": "sanic",
+    "sty": "sty",
+    "thonny": "thonny",
+    "typesystem": "typesystem",
+}
+
+SUCCESS = "success"
+EQUIVALENT = "equivalent"
+FAIL = "fail"
+
+OUTCOMES = [SUCCESS, EQUIVALENT, FAIL]
+OUTCOME_NAMES = ["Success", "Claimed Equivalent", "Failed"]
 
 
 # %% Helpers
@@ -150,43 +221,13 @@ class LongId(NamedTuple):
         parts = long_id.split("_")
         preset = "_".join(parts[:3])
         package = "_".join(parts[3:-1])
-        project = package_to_project[package]
+        project = PACKAGE_TO_PROJECT[package]
         id = parts[-1]
         return LongId(preset, package, project, id)
 
 
 # %% Read and prepare data
 # ======================================================================================================================
-
-
-# %% Define constants for presets
-
-PRESETS = [
-    "baseline_without_iterations",
-    "baseline_with_iterations",
-    "debugging_zero_shot",
-    "debugging_one_shot",
-]
-
-PRESET_NAMES = [
-    "Baseline w/o iterations",
-    "Baseline w/ iterations",
-    "Scientific Debugging (0-shot)",
-    "Scientific Debugging (1-shot)",
-]
-
-PROJECTS = [
-    "apimd",
-    "codetiming",
-    "dataclasses-json",
-    "docstring_parser",
-    "flake8",
-    "flutes",
-    "flutils",
-    "httpie",
-    "pdir2",
-    "python-string-utils",
-]
 
 
 # %% Load json result files
@@ -273,35 +314,8 @@ else:
 
 # %% Add project name to data
 
-package_to_project = {
-    "apimd": "apimd",
-    "black": "black",
-    "blackd": "black",
-    "black_primer": "black",
-    "blib2to3": "black",
-    "_black_version": "black",
-    "codetiming": "codetiming",
-    "dataclasses_json": "dataclasses-json",
-    "docstring_parser": "docstring_parser",
-    "flake8": "flake8",
-    "flutes": "flutes",
-    "flutils": "flutils",
-    "httpie": "httpie",
-    "isort": "isort",
-    "mimesis": "mimesis",
-    "pdir": "pdir2",
-    "py_backwards": "py-backwards",
-    "pymonet": "pyMonet",
-    "pypara": "pypara",
-    "semantic_release": "python-semantic-release",
-    "string_utils": "python-string-utils",
-    "pytutils": "pytutils",
-    "sanic": "sanic",
-    "sty": "sty",
-    "thonny": "thonny",
-    "typesystem": "typesystem",
-}
-data["project"] = data["problem.module_path"].map(lambda path: package_to_project[path.rsplit("/")[-1]])
+
+data["project"] = data["problem.module_path"].map(lambda path: PACKAGE_TO_PROJECT[path.rsplit("/")[-1]])
 
 
 # %% Add mutant identifier to data
@@ -325,18 +339,12 @@ class MutantId(NamedTuple):
 
 data["mutant_id"] = data.apply(MutantId.from_row, axis=1)
 
+
 # %% Compute outcome for simplicity
+
 
 # TODO: There are also some runs that claimed the mutant is equivalent and then killed the mutant.
 # These either need to be handled differently of this needs to be explained in the paper/thesis.
-
-
-SUCCESS = "success"
-EQUIVALENT = "equivalent"
-FAIL = "fail"
-
-OUTCOMES = [SUCCESS, EQUIVALENT, FAIL]
-OUTCOME_NAMES = ["Success", "Claimed Equivalent", "Failed"]
 
 
 @block
@@ -389,8 +397,9 @@ def add_mutant_lines_to_data():
 
 # %% Read combined coverage info (coverage of all (non-flaky) tests from a project)
 
-# coverage.py only counts lines or branches as missing if the containing module was at least loaded (TODO: confirm).
-# This could lead to a different number of total branches between the measurements. The coverage measures can however
+
+# coverage.py only counts lines or branches as missing if the containing module was at least loaded.
+# This leads to a different number of total branches between the measurements. The coverage measures can however
 # still easily be compared by dividing the number of hit lines/branches by the number of the union of all recorded
 # lines/branches. This means that the coverage might still be off compared to the "true" coverage containing all lines # and branches in the project, but all coverage measurements will be equally off.
 
@@ -419,10 +428,6 @@ def read_coverage_py_json(coverage_json: JsonObj) -> Coverage:
     missing_branches = []
     executed_branches = []
     for file_name, file in coverage_json["files"].items():
-        # missing_lines += [f"{file_name}::{line}" for line in file["missing_lines"]]
-        # executed_lines += [f"{file_name}::{line}" for line in file["executed_lines"]]
-        # missing_branches += [f"{file_name}::{branch}" for branch in file["missing_branches"]]
-        # executed_branches += [f"{file_name}::{branch}" for branch in file["executed_branches"]]
         missing_lines += [LineId(file_name, line) for line in file["missing_lines"]]
         executed_lines += [LineId(file_name, line) for line in file["executed_lines"]]
         missing_branches += [BranchId(file_name, branch[0], branch[1]) for branch in file["missing_branches"]]
@@ -430,7 +435,7 @@ def read_coverage_py_json(coverage_json: JsonObj) -> Coverage:
     return Coverage(missing_lines, executed_lines, missing_branches, executed_branches)
 
 
-def read_combined_coverage():
+def read_coverage():
     map = {}
     for coverage_path in RESULTS_DIR.glob("*/coverage/coverage.json"):
         results_dir = (coverage_path / ".." / "..").resolve()
@@ -441,10 +446,10 @@ def read_combined_coverage():
     return map
 
 
-coverage_map: Dict[Tuple[str, str], Coverage] = read_combined_coverage()
+coverage_map: Dict[Tuple[str, str], Coverage] = read_coverage()
 
 
-def read_pynguin_combined_coverage():
+def read_pynguin_coverage():
     map = {}
     for coverage_path in PYNGUIN_TESTS_DIR.glob("*/*/coverage/coverage.json"):
         project = coverage_path.parent.parent.parent.name
@@ -457,7 +462,7 @@ def read_pynguin_combined_coverage():
     return map
 
 
-pynguin_coverage_map: Dict[Tuple[str, int], Coverage] = read_pynguin_combined_coverage()
+pynguin_coverage_map: Dict[Tuple[str, int], Coverage] = read_pynguin_coverage()
 
 
 def sum_code_elements():
@@ -489,6 +494,25 @@ def sum_code_elements():
 
 
 all_seen_lines_map, all_seen_branches_map = sum_code_elements()
+
+
+# %% Print number of seen lines and branches
+
+
+@block
+def print_seen_lines_and_branches():
+    for project in data["project"].unique():
+        lines = [
+            len(coverage_map[(preset, project)].missing_lines) + len(coverage_map[(preset, project)].executed_lines)
+            for preset in PRESETS
+        ]
+        branches = [
+            len(coverage_map[(preset, project)].missing_branches)
+            + len(coverage_map[(preset, project)].executed_branches)
+            for preset in PRESETS
+        ]
+        print(f"{project}: {lines}")
+        print(f"{project}: {branches}")
 
 
 # %% Add cosmic-ray results
@@ -579,6 +603,7 @@ def add_cosmic_ray_results_to_data():
 
 # %% Read Pynguin cosmic-ray results
 
+
 PYNGUIN_FAILED_TEST_REGEX = re.compile(r"Test failed: (.*)")
 
 
@@ -604,6 +629,7 @@ pynguin_data = pd.DataFrame(pynguin_data)
 
 
 # %% Sum up Pynguin results
+
 
 type Project = str
 
@@ -700,7 +726,7 @@ def add_equivalence_claims():
 # %% Helper functions
 
 
-def get_result(exp_or_test: JsonObj, mutant: bool = False) -> JsonObj | None:
+def get_execution_result(exp_or_test: JsonObj, mutant: bool = False) -> JsonObj | None:
     if exp_or_test is None:
         return None
 
@@ -728,7 +754,7 @@ def covers_mutant(row, experiments_or_tests: Literal["experiments", "tests"]):
     return any(
         set(coverage["covered_lines"]).intersection(mutant_lines)
         for exp in row[experiments_or_tests]
-        if (exec_result := get_result(exp)) and (coverage := exec_result["coverage"])
+        if (exec_result := get_execution_result(exp)) and (coverage := exec_result["coverage"])
     )
 
 
@@ -741,7 +767,7 @@ data["mutant_covered"] = data["mutant_covered.by_experiment"] | data["mutant_cov
 
 
 def get_line_coverage_from_test(test):
-    exec_result = get_result(test)
+    exec_result = get_execution_result(test)
     if (exec_result is None) or (exec_result["coverage"] is None):
         return [], []
     coverage = exec_result["coverage"]
@@ -766,7 +792,7 @@ data["coverage.missing_line_ids"] = data.apply(
 
 
 def get_branch_coverage_from_test(test):
-    exec_result = get_result(test)
+    exec_result = get_execution_result(test)
     if (exec_result is None) or (exec_result["coverage"] is None):
         return [], []
     coverage = exec_result["coverage"]
@@ -865,6 +891,7 @@ def combine_seen_lines_and_branches():
 
 # %% Compute Token Usage
 
+
 data["usage.prompt_tokens"] = data["conversation"].map(
     lambda c: sum(msg["usage"]["prompt_tokens"] for msg in c if msg["role"] == "assistant")
 )
@@ -894,6 +921,7 @@ data["usage.cost"] = (
 
 # %% Compute Token Usage of first 10 messages
 
+
 data["num_messages.f10"] = data["conversation"].map(
     lambda c: len([msg for msg in c if msg["role"] == "assistant"][:10])
 )
@@ -921,6 +949,7 @@ data["usage.cost.f10"] = (
 
 # %% Compute Token Usage of last 10 messages
 
+
 data["num_messages.l10"] = data["conversation"].map(
     lambda c: len([msg for msg in c if msg["role"] == "assistant"][10:])
 )
@@ -947,6 +976,7 @@ data["usage.cost.l10"] = (
 
 
 # %% Count messages, experiments, tests
+
 
 data["num_completions"] = data["conversation"].map(
     lambda conv: len([msg for msg in conv if msg["role"] == "assistant"])
@@ -1004,9 +1034,11 @@ data["num_invalid_tests"] = data["tests"].map(
 
 # %% Count invalid messages
 
+
 data["num_incomplete_responses"] = data["conversation"].map(
     lambda conv: len([msg for msg in conv if msg["tag"] == "incomplete_response"])
 )
+
 
 # %% Estimate test LOC
 
@@ -1028,7 +1060,7 @@ def count_import_errors(exps_or_tests):
         [
             exp
             for exp in exps_or_tests
-            if (exec_result := get_result(exp)) and "ModuleNotFoundError" in exec_result["output"]
+            if (exec_result := get_execution_result(exp)) and "ModuleNotFoundError" in exec_result["output"]
         ]
     )
 
@@ -1042,8 +1074,8 @@ data["num_test_import_errors"] = data["tests"].map(count_import_errors)
 
 def has_exit_code_difference(row):
     for exp_or_test in row["experiments"] + row["tests"]:
-        if (correct_result := get_result(exp_or_test, mutant=False)) and (
-            mutant_result := get_result(exp_or_test, mutant=True)
+        if (correct_result := get_execution_result(exp_or_test, mutant=False)) and (
+            mutant_result := get_execution_result(exp_or_test, mutant=True)
         ):
             if correct_result["exitcode"] != mutant_result["exitcode"]:
                 return True
@@ -1052,8 +1084,8 @@ def has_exit_code_difference(row):
 
 def has_output_difference(row):
     for exp_or_test in row["experiments"] + row["tests"]:
-        if (correct_result := get_result(exp_or_test, mutant=False)) and (
-            mutant_result := get_result(exp_or_test, mutant=True)
+        if (correct_result := get_execution_result(exp_or_test, mutant=False)) and (
+            mutant_result := get_execution_result(exp_or_test, mutant=True)
         ):
             correct_output = correct_result["output"].replace(correct_result["cwd"], "")
             mutant_output = mutant_result["output"].replace(mutant_result["cwd"], "")
@@ -1066,18 +1098,164 @@ data["exit_code_diff"] = data.apply(lambda row: has_exit_code_difference(row), a
 data["output_diff"] = data.apply(lambda row: has_output_difference(row), axis=1)
 
 
+# %% Sample equivalent and failed runs
+
+
+def sample_mutants():
+    # include all of baseline (only 34 unkilled claimed mutants)
+    sampled_mutants = data[
+        ((data["preset"] == "baseline_with_iterations") | (data["preset"] == "baseline_without_iterations"))
+        & (data["outcome"] == EQUIVALENT)
+        & (~data["cosmic_ray.killed_by_any"])
+    ]
+
+    for project in data["project"].unique():
+        # The "cosmic_ray.killed_by_any" and "mutant.num_equivalence_claims" columns are replicated for each preset.
+        # Therefore, we only look at the "debugging_one_shot" data here.
+        target_data = data[(data["project"] == project) & (data["preset"] == "debugging_one_shot")]
+
+        # include 5 mutants for each number of claims
+        for num_claims in [3, 2, 1, 0]:
+            new_mutants = cast(
+                pd.DataFrame,
+                target_data[
+                    (target_data["mutant.num_equivalence_claims"] == num_claims)
+                    & (~target_data["cosmic_ray.killed_by_any"])
+                    & (
+                        ~cast(pd.Series, target_data["mutant_id"]).isin(
+                            cast(pd.Series, sampled_mutants["mutant_id"]).unique()
+                        )
+                    )
+                ],
+            )
+            new_sample = new_mutants.sample(n=min(len(new_mutants), 5), random_state=1)
+            # print(f"sampled {len(new_sample)} with {num_claims} claims from {project}")
+            sampled_mutants = pd.concat([sampled_mutants, new_sample])
+
+    # Double-check that we don't have any duplicate mutants
+    assert len(sampled_mutants) == len(set(sampled_mutants["mutant_id"]))
+
+    print(f"{len(sampled_mutants):4d} mutants in total")
+    print()
+
+    for num_claims in [0, 1, 2, 3]:
+        print(
+            f"{len(sampled_mutants[sampled_mutants["mutant.num_equivalence_claims"] == num_claims]):4d} mutants with {num_claims} claims"
+        )
+    print()
+
+    for project in data["project"].unique():
+        print(f"{len(sampled_mutants[sampled_mutants["project"] == project]):4d} mutants from {project}")
+    print()
+
+    sampled_mutants_per_preset = {}
+    for index, row in sampled_mutants.iterrows():
+        for claim in row["mutant.equivalence_claims"]:
+            sampled_mutants_per_preset[claim.preset] = sampled_mutants_per_preset.get(claim.preset, []) + [claim.preset]
+    for preset in data["preset"].unique():
+        print(f"{len(sampled_mutants_per_preset.get(preset, [])):4d} mutants from {preset}")
+    print()
+    del sampled_mutants_per_preset
+
+    # Write to CSV
+
+    column_mapping = {
+        "project": "project",
+        "problem.target_path": "target_path",
+        "problem.mutant_op": "mutant_op",
+        "problem.occurrence": "occurrence",
+        "claim1": "claim1",
+        "claim2": "claim2",
+        "claim3": "claim3",
+    }
+
+    sampled_mutants["claim1"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
+        lambda claims: claims[0].id if len(claims) > 0 else None
+    )
+    sampled_mutants["claim2"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
+        lambda claims: claims[1].id if len(claims) > 1 else None
+    )
+    sampled_mutants["claim3"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
+        lambda claims: claims[2].id if len(claims) > 2 else None
+    )
+
+    sampled_mutants = cast(pd.DataFrame, sampled_mutants).sort_values(
+        by=["project", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
+    )
+
+    sampled_mutants.rename(columns=column_mapping).assign(equivalent=None, unsure=None, comment=None).to_csv(
+        OUTPUT_PATH / "sampled_mutants.csv",
+        columns=[*column_mapping.values(), "equivalent", "unsure", "comment"],
+    )
+
+    return sampled_mutants
+
+
+sampled_mutants = sample_mutants()
+
+
+# %% Read sample data
+
+
+@block
+def add_sample_results_to_data():
+    sample_data = pd.read_csv(REPO_PATH / "samples" / "sampled_mutants.csv")
+    column_mapping = {
+        "equivalent": "sample.equivalent",
+        "unsure": "sample.unsure",
+        "change": "sample.change",
+        "kill_method": "sample.kill_method",
+        "comment": "sample.comment",
+    }
+
+    def sample_row_to_dict(row):
+        return {val: row[key] for key, val in column_mapping.items()}
+
+    def sample_row_to_mutant_id(row):
+        return MutantId(
+            project=row["project"],
+            target_path=row["target_path"],
+            mutant_op=row["mutant_op"],
+            occurrence=row["occurrence"],
+        )
+
+    def convert_csv_value(value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if np.isnan(value):
+            return None
+        if value == 0:
+            return False
+        if value == 1:
+            return True
+        return value
+
+    sample_data = {sample_row_to_mutant_id(row): sample_row_to_dict(row) for _, row in sample_data.iterrows()}
+
+    for name in column_mapping.values():
+        data[name] = data["mutant_id"].map(
+            lambda mutant_id: convert_csv_value(sample_data[mutant_id][name]) if mutant_id in sample_data else None
+        )
+        # data[name] = data[name].map(lambda val: None if np.isnan(val) else None)
+    data["sampled"] = data["sample.equivalent"].map(lambda b: b is not None)
+
+
 # %% Print memory usage
+
 
 with open("/proc/self/status") as f:
     memusage = f.read().split("VmRSS:")[1].split("\n")[0][:-3]
     print(f"Memory used: {int(memusage.strip()) / (1024**2):.3f} GB")
 
+
 # %% Print available columns (data_columns)
+
 
 cols = list(data.columns)
 mid = int(((len(cols) + 1) // 2))
 for x, y in zip(cols[:mid] + [""], cols[mid:] + [""]):
-    print(f"{x:<40} {y}")
 
 # %% Misc Plots and Data
 # ======================================================================================================================
@@ -1110,6 +1288,7 @@ def string_colors(strings: Iterable[str], num_colors=10):
 
 # %% Number of turns
 
+
 # for preset in data["preset"].unique():
 #     target_data = data[data["preset"] == preset]
 #
@@ -1128,6 +1307,7 @@ def string_colors(strings: Iterable[str], num_colors=10):
 
 
 # %% Number of turns per successful / unsuccessful run
+
 
 # for preset in data["preset"].unique():
 #     target_data = data[data["preset"] == preset]
@@ -1213,6 +1393,7 @@ for project in np.unique(data[["project"]]):
 
 # %% Number of experiments / tests per mutant
 
+
 for preset in data["preset"].unique():
     if not preset.startswith("debugging"):
         continue
@@ -1227,23 +1408,33 @@ for preset in data["preset"].unique():
     fig.text(0.00, 1.02, preset)
     plt.show()
 
+
 # %% Success rate
+
 
 print(data["mutant_killed"].sum() / data["mutant_killed"].count())
 
+
 # %% Mean test LOC
+
 
 data.groupby("preset")["test_loc"].mean()
 
+
 # %% Conversations with unparsable messages
+
 
 data[data["num_incomplete_responses"] > 0]["long_id"]
 
+
 # %% Non compilable experiments / tests
+
 
 data[["num_invalid_experiments", "num_invalid_tests"]].sum()
 
+
 # %% Mutants with import errors
+
 
 len(data[(data["num_experiment_import_errors"] + data["num_test_import_errors"]) > 0])
 
@@ -1276,31 +1467,40 @@ for preset in data["preset"].unique():
 
     print("\n")
 
+
 # %% Runs that had a difference in output but didn't result in a killing test
+
 
 len(data[data["output_diff"] & ~data["mutant_killed"]]["id"])
 
 
 # %% Mutants that were claimed equivalent but were still killed
 
+
 len(data[data["mutant_killed"] & data["claimed_equivalent"]])
 
 
 # %% Number of runs with more completions than allowed turns
 
+
 len(data[data["num_completions"] > 10])
+
 
 # %% Number of runs with more completions than allowed turns, that still killed the mutant
 
+
 len(data[(data["num_completions"] > 10) & data["mutant_killed"]])
 
+
 # %% Equivalences per project
+
 
 equivs = data[data["claimed_equivalent"]]
 equivs.groupby(["project", "preset"]).size()
 
 
 # %% Failed runs with less than 10 messages
+
 
 data[(data["outcome"] == FAIL) & (data["num_turns"] != 10) & (data["preset"] != "baseline_without_iterations")][
     ["long_id", "num_completions"]
@@ -1309,10 +1509,12 @@ data[(data["outcome"] == FAIL) & (data["num_turns"] != 10) & (data["preset"] != 
 
 # %% Sample of equivalences
 
+
 data[data["claimed_equivalent"]].sample(n=10, random_state=1)["long_id"]
 
 
 # %% Killed mutants
+
 
 print(f"Directly killed mutants: {len(data[data["mutant_killed"]])}")
 print(f"Mutants killed by tests from the same run: {len(data[data["cosmic_ray.killed_by_own"]])}")
@@ -1320,6 +1522,7 @@ print(f"Mutants killed by tests from the any run: {len(data[data["cosmic_ray.kil
 
 
 # %% Equivalent mutants
+
 
 print(f"Equivalence-claimed mutants: {len(data[data["claimed_equivalent"]])}")
 print(
@@ -1330,143 +1533,8 @@ print(
 )
 
 
-# %% Plot percentage of equivalence claims
-
-ticks = []
-percentages_killed = []
-percentages_unkilled = []
-
-for preset in data["settings.preset_name"].unique():
-    if preset == "baseline_without_iterations":
-        continue
-
-    for project in data["project"].unique():
-        target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
-        claims_unkilled = target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray.killed_by_any"]]
-        claims_killed = target_data[(target_data["outcome"] == EQUIVALENT) & target_data["cosmic_ray.killed_by_any"]]
-        ticks.append(f"{project} {preset}")
-        percentages_killed.append(len(claims_killed) / len(target_data))
-        percentages_unkilled.append(len(claims_unkilled) / len(target_data))
-
-fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
-x = np.arange(len(ticks))
-bar1 = ax.bar(x, percentages_unkilled, color=cmap_colors[0])
-bar2 = ax.bar(
-    x,
-    percentages_killed,
-    color=cmap_colors[1],
-    bottom=percentages_unkilled,
-)
-ax.set_xticks(x)
-ax.set_xticklabels(ticks, rotation=90)
-ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
-ax.legend(
-    [bar1, bar2],
-    ["Mutants claimed equivalent (not killed by any test)", "Mutants claimed equivalent (killed by some test)"],
-)
-plt.show()
-
-del ticks
-del percentages_killed
-del percentages_unkilled
-
-
-# %% Plot percentage of failed runs
-
-ticks = []
-percentages_killed = []
-percentages_unkilled = []
-
-for preset in data["settings.preset_name"].unique():
-    if preset == "baseline_without_iterations":
-        continue
-
-    for project in data["project"].unique():
-        target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
-        failed_runs_unkilled = target_data[(target_data["outcome"] == FAIL) & ~target_data["cosmic_ray.killed_by_any"]]
-        failed_runs_killed = target_data[(target_data["outcome"] == FAIL) & target_data["cosmic_ray.killed_by_any"]]
-        ticks.append(f"{project} {preset}")
-        percentages_killed.append(len(failed_runs_killed) / len(target_data))
-        percentages_unkilled.append(len(failed_runs_unkilled) / len(target_data))
-
-fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
-x = np.arange(len(ticks))
-bar1 = ax.bar(x, percentages_unkilled, color=cmap_colors[0])
-bar2 = ax.bar(
-    x,
-    percentages_killed,
-    color=cmap_colors[1],
-    bottom=percentages_unkilled,
-)
-ax.set_xticks(x)
-ax.set_xticklabels(ticks, rotation=90)
-ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
-ax.legend(
-    [bar1, bar2],
-    ["Failed runs (mutant not killed by any test)", "Failed runs (mutant killed by some test)"],
-)
-plt.show()
-
-del ticks
-del percentages_killed
-del percentages_unkilled
-
-
-# %% Plot percentage of direct kills
-
-ticks = []
-percentages = []  # [direct kill, kill with tests from same run, kill with any tests]
-
-for preset in data["settings.preset_name"].unique():
-    for project in data["project"].unique():
-        target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
-        ticks.append(f"{project} {preset}")
-        percentages.append(
-            [
-                len(target_data[target_data["mutant_killed"]]) / len(target_data),
-                len(target_data[target_data["cosmic_ray.killed_by_own"]]) / len(target_data),
-                len(target_data[target_data["cosmic_ray.killed_by_any"]]) / len(target_data),
-            ]
-        )
-
-
-color1 = cmap_colors[0]
-color3 = cmap_colors[1]
-color2 = ((color1[0] + color3[0]) / 2, (color1[1] + color3[1]) / 2, (color1[2] + color3[2]) / 2)
-
-fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
-x = np.arange(len(ticks))
-bar1 = ax.bar(x, [p[0] for p in percentages], color=cmap_colors[0])
-bar2 = ax.bar(
-    x,
-    [p[1] - p[0] for p in percentages],
-    color=cmap_colors[2],
-    bottom=[p[0] for p in percentages],
-)
-bar3 = ax.bar(
-    x,
-    [p[2] - p[1] for p in percentages],
-    color=cmap_colors[4],
-    bottom=[p[1] for p in percentages],
-)
-ax.set_xticks(x)
-ax.set_xticklabels(ticks, rotation=90)
-ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
-ax.legend(
-    [bar3, bar2, bar1],
-    [
-        "Mutants killed by any test.",
-        "Mutants killed by tests from the same preset.",
-        "Mutants killed by sucessful runs.",
-    ],
-)
-plt.show()
-
-del ticks
-del percentages
-
-
 # %% Number of mutants with 0/1/2/3 claims
+
 
 print(f"mutants with {0} claims: {len(data[data["mutant.num_equivalence_claims"] == 0])//4:4d}")
 print(f"mutants with {1} claims: {len(data[data["mutant.num_equivalence_claims"] == 1])//4:4d}")
@@ -1477,6 +1545,7 @@ print(f"total number of claims: {len(data[data["claimed_equivalent"]])}")
 
 
 # %% Number of unkilled mutants with 1/2/3 claims per preset and project
+
 
 for preset in data["preset"].unique():
     if preset == "baseline_without_iterations":
@@ -1491,7 +1560,9 @@ for preset in data["preset"].unique():
         killed_by_3 = len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 3])
         print(f"{preset:<25} {project:<20} {killed_by_1:3} {killed_by_2:3} {killed_by_3:3}")
 
+
 # %% Number of unkilled mutants with 1/2/3 claims per project
+
 
 for project in data["project"].unique():
     target_data = data[(data["project"] == project)]
@@ -1503,147 +1574,8 @@ for project in data["project"].unique():
     )
 
 
-# %% Sample equivalent and failed runs
-
-# include all of baseline (only 34 unkilled claimed mutants)
-sampled_mutants = data[
-    ((data["preset"] == "baseline_with_iterations") | (data["preset"] == "baseline_without_iterations"))
-    & (data["outcome"] == EQUIVALENT)
-    & (~data["cosmic_ray.killed_by_any"])
-]
-
-for project in data["project"].unique():
-    # The "cosmic_ray.killed_by_any" and "mutant.num_equivalence_claims" columns are replicated for each preset.
-    # Therefore, we only look at the "debugging_one_shot" data here.
-    target_data = data[(data["project"] == project) & (data["preset"] == "debugging_one_shot")]
-
-    # include 5 mutants for each number of claims
-    for num_claims in [3, 2, 1, 0]:
-        new_mutants = cast(
-            pd.DataFrame,
-            target_data[
-                (target_data["mutant.num_equivalence_claims"] == num_claims)
-                & (~target_data["cosmic_ray.killed_by_any"])
-                & (
-                    ~cast(pd.Series, target_data["mutant_id"]).isin(
-                        cast(pd.Series, sampled_mutants["mutant_id"]).unique()
-                    )
-                )
-            ],
-        )
-        new_sample = new_mutants.sample(n=min(len(new_mutants), 5), random_state=1)
-        # print(f"sampled {len(new_sample)} with {num_claims} claims from {project}")
-        sampled_mutants = pd.concat([sampled_mutants, new_sample])
-
-# Double-check that we don't have any duplicate mutants
-assert len(sampled_mutants) == len(set(sampled_mutants["mutant_id"]))
-
-print(f"{len(sampled_mutants):4d} mutants in total")
-print()
-
-for num_claims in [0, 1, 2, 3]:
-    print(
-        f"{len(sampled_mutants[sampled_mutants["mutant.num_equivalence_claims"] == num_claims]):4d} mutants with {num_claims} claims"
-    )
-print()
-
-for project in data["project"].unique():
-    print(f"{len(sampled_mutants[sampled_mutants["project"] == project]):4d} mutants from {project}")
-print()
-
-sampled_mutants_per_preset = {}
-for index, row in sampled_mutants.iterrows():
-    for claim in row["mutant.equivalence_claims"]:
-        sampled_mutants_per_preset[claim.preset] = sampled_mutants_per_preset.get(claim.preset, []) + [claim.preset]
-for preset in data["preset"].unique():
-    print(f"{len(sampled_mutants_per_preset.get(preset, [])):4d} mutants from {preset}")
-print()
-del sampled_mutants_per_preset
-
-# Write to CSV
-
-column_mapping = {
-    "project": "project",
-    "problem.target_path": "target_path",
-    "problem.mutant_op": "mutant_op",
-    "problem.occurrence": "occurrence",
-    "claim1": "claim1",
-    "claim2": "claim2",
-    "claim3": "claim3",
-}
-
-sampled_mutants["claim1"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
-    lambda claims: claims[0].id if len(claims) > 0 else None
-)
-sampled_mutants["claim2"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
-    lambda claims: claims[1].id if len(claims) > 1 else None
-)
-sampled_mutants["claim3"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
-    lambda claims: claims[2].id if len(claims) > 2 else None
-)
-
-sampled_mutants = cast(pd.DataFrame, sampled_mutants).sort_values(
-    by=["project", "problem.target_path", "problem.mutant_op", "problem.occurrence"]
-)
-
-sampled_mutants.rename(columns=column_mapping).assign(equivalent=None, unsure=None, comment=None).to_csv(
-    OUTPUT_PATH / "sampled_mutants.csv",
-    columns=[*column_mapping.values(), "equivalent", "unsure", "comment"],
-)
-
-
-# %% Read sample data
-
-sample_data = pd.read_csv(REPO_PATH / "samples" / "sampled_mutants.csv")
-column_mapping = {
-    "equivalent": "sample.equivalent",
-    "unsure": "sample.unsure",
-    "change": "sample.change",
-    "kill_method": "sample.kill_method",
-    "comment": "sample.comment",
-}
-
-
-def sample_row_to_dict(row):
-    return {val: row[key] for key, val in column_mapping.items()}
-
-
-def sample_row_to_mutant_id(row):
-    return MutantId(
-        project=row["project"],
-        target_path=row["target_path"],
-        mutant_op=row["mutant_op"],
-        occurrence=row["occurrence"],
-    )
-
-
-def convert_csv_value(value):
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    if np.isnan(value):
-        return None
-    if value == 0:
-        return False
-    if value == 1:
-        return True
-    return value
-
-
-sample_data = {sample_row_to_mutant_id(row): sample_row_to_dict(row) for _, row in sample_data.iterrows()}
-
-for name in column_mapping.values():
-    data[name] = data["mutant_id"].map(
-        lambda mutant_id: convert_csv_value(sample_data[mutant_id][name]) if mutant_id in sample_data else None
-    )
-    # data[name] = data[name].map(lambda val: None if np.isnan(val) else None)
-data["sampled"] = data["sample.equivalent"].map(lambda b: b is not None)
-
-
 # %% Check which percentage of mutants with n claims were (not) killed
 
-mutant_data = data[data["preset"] == "debugging_one_shot"]
 
 for num_claims in [0, 1, 2, 3]:
     percentage = len(
@@ -1651,10 +1583,9 @@ for num_claims in [0, 1, 2, 3]:
     ) / len(data[data["mutant.num_equivalence_claims"] == num_claims])
     print(f"{percentage * 100:5.2f}% of mutants with {num_claims} claims weren't killed by any test")
 
-del mutant_data
-
 
 # %% Anomalies
+
 
 data[data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].apply(
     lambda row: (row["preset"], row["mutant_id"].project), axis=1
@@ -1664,6 +1595,7 @@ data[data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].
 
 
 # %% Overview over sampled mutants
+
 
 target_data = data[data["preset"] == "debugging_one_shot"]
 for n in target_data["mutant.num_equivalence_claims"].unique():  # pyright: ignore
@@ -1820,6 +1752,94 @@ def plot_percentage_of_direct_kills():
     plt.show()
 
 
+# %% Plot percentage of equivalence claims
+
+
+@block
+@savefig
+def plot_percentage_of_equivalence_claims():
+    ticks = []
+    percentages_killed = []
+    percentages_unkilled = []
+
+    for preset in data["settings.preset_name"].unique():
+        if preset == "baseline_without_iterations":
+            continue
+
+        for project in data["project"].unique():
+            target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
+            claims_unkilled = target_data[
+                (target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray.killed_by_any"]
+            ]
+            claims_killed = target_data[
+                (target_data["outcome"] == EQUIVALENT) & target_data["cosmic_ray.killed_by_any"]
+            ]
+            ticks.append(f"{project} {preset}")
+            percentages_killed.append(len(claims_killed) / len(target_data))
+            percentages_unkilled.append(len(claims_unkilled) / len(target_data))
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
+    x = np.arange(len(ticks))
+    bar1 = ax.bar(x, percentages_unkilled, color=cmap_colors[0])
+    bar2 = ax.bar(
+        x,
+        percentages_killed,
+        color=cmap_colors[1],
+        bottom=percentages_unkilled,
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(ticks, rotation=90)
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
+    ax.legend(
+        [bar1, bar2],
+        ["Mutants claimed equivalent (not killed by any test)", "Mutants claimed equivalent (killed by some test)"],
+    )
+    return fig
+
+
+# %% Plot percentage of failed runs
+
+
+@block
+@savefig
+def plot_percentage_of_failed_runs():
+    ticks = []
+    percentages_killed = []
+    percentages_unkilled = []
+
+    for preset in data["settings.preset_name"].unique():
+        if preset == "baseline_without_iterations":
+            continue
+
+        for project in data["project"].unique():
+            target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
+            failed_runs_unkilled = target_data[
+                (target_data["outcome"] == FAIL) & ~target_data["cosmic_ray.killed_by_any"]
+            ]
+            failed_runs_killed = target_data[(target_data["outcome"] == FAIL) & target_data["cosmic_ray.killed_by_any"]]
+            ticks.append(f"{project} {preset}")
+            percentages_killed.append(len(failed_runs_killed) / len(target_data))
+            percentages_unkilled.append(len(failed_runs_unkilled) / len(target_data))
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
+    x = np.arange(len(ticks))
+    bar1 = ax.bar(x, percentages_unkilled, color=cmap_colors[0])
+    bar2 = ax.bar(
+        x,
+        percentages_killed,
+        color=cmap_colors[1],
+        bottom=percentages_unkilled,
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(ticks, rotation=90)
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
+    ax.legend(
+        [bar1, bar2],
+        ["Failed runs (mutant not killed by any test)", "Failed runs (mutant killed by some test)"],
+    )
+    return fig
+
+
 # %% Paper RQ 1: How does our approach perform compared to Pynguin?
 # ======================================================================================================================
 
@@ -1846,19 +1866,27 @@ token_cols = [
     "usage.cost",
 ]
 
+
 # %% Mean usage for a single mutant
+
 
 data.groupby("preset")[token_cols].mean()
 
+
 # %% Mean usage mean for a single project (1000 or fewer mutants)
+
 
 data.groupby(["preset", "project"])[token_cols].sum().groupby("preset").mean()
 
+
 # %% Total usage
+
 
 data[token_cols].sum()
 
+
 # %% Plot mean cost per preset and project
+
 
 save_figs = True
 
@@ -2113,24 +2141,58 @@ def plot_mean_mutation_score_with_pynguin():
         group = data[data["preset"] == preset]
         values.append(group["cosmic_ray.killed_by_own"].sum())
 
-    num_pynguin_killed = 0
-    for project, run in best_pynguin_runs.items():
-        best_run_for_project_data = pynguin_data[
-            (pynguin_data["project"] == project) & (pynguin_data["index"] == run.index_)
-        ]  # pyright: ignore
-        num_pynguin_killed += best_run_for_project_data["killed"].sum()  # pyright: ignore
-    values.append(num_pynguin_killed)
+    # num_pynguin_killed = 0
+    # for project, run in best_pynguin_runs.items():
+    #     best_run_for_project_data = pynguin_data[
+    #         (pynguin_data["project"] == project) & (pynguin_data["index"] == run.index_)
+    #     ]  # pyright: ignore
+    #     num_pynguin_killed += best_run_for_project_data["killed"].sum()  # pyright: ignore
+    # values.append(num_pynguin_killed)
+
+    values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_best"].sum())
+    values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_any"].sum())
 
     values = np.array(values) / len(data[data["preset"] == PRESETS[0]])
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    ax.bar(x=np.arange(5), height=values)
+    ax.bar(x=np.arange(6), height=values)
 
-    ax.set_xticks(np.arange(5))
-    ax.set_xticklabels(PRESET_NAMES + ["Pynguin"], rotation=90)
+    ax.set_xticks(np.arange(6))
+    ax.set_xticklabels(PRESET_NAMES + ["Pynguin (best run)", "Pynguin (combined)"], rotation=90)
 
     fig.legend(["Branch Coverage"], loc="lower right")
     return fig
+
+
+# %% Mann-Whitney U Test
+
+
+@block
+def mannwhitneyu_test():
+    grouped_guut_data = data.groupby("preset")
+    guut_groups = {preset: grouped_guut_data.get_group(preset)["cosmic_ray.killed_by_own"] for preset in PRESETS}
+
+    grouped_pynguin_data = pynguin_data.groupby("index")  # pyright: ignore
+    pynguin_groups = {index: grouped_pynguin_data.get_group(index)["killed"] for index in range(1, 31)}
+
+    results = {}
+    results["comparison"] = []
+    for preset in PRESETS:
+        results[f"{preset}_statistic"] = []
+        results[f"{preset}_pvalue"] = []
+
+    for group_name_2, values_2 in (guut_groups | pynguin_groups).items():
+        if isinstance(group_name_2, int):
+            group_name_2 = f"pynguin_{group_name_2}"
+        results["comparison"].append(group_name_2)
+
+        for group_name_1, values_1 in guut_groups.items():
+            result = mannwhitneyu(values_1, values_2)
+            results[f"{group_name_1}_statistic"].append(result.statistic)
+            results[f"{group_name_1}_pvalue"].append(result.pvalue)
+
+    df = pd.DataFrame(results)
+    df.to_csv(OUTPUT_PATH / "mannwhitneyu.csv")
 
 
 # %% Paper RQ 2: Can our approach reliably detect equivalent mutants
@@ -2165,6 +2227,7 @@ def plot_num_turns():
 
 # %% Number of turns (excluding turns after an equivalence claim is made)
 
+
 # There are 356 (=len(data[data["mutant_killed"] & data["claimed_equivalent"]])) mutants that were claimed
 # equivalent and then killed in the same conversation. This plot shows what the number of turns would look like
 # if we stopped at every equivalence claim.
@@ -2186,6 +2249,7 @@ def plot_num_turns_before_equivalence_claim():
 
 # %% Number of completions
 
+
 # The number of all messages generated by the LLM.
 # This includes invalid responses and equivalence claims.
 
@@ -2202,6 +2266,7 @@ def plot_num_completions():
 
 
 # %% Number of completions (excluding completions after an equivalence claim is made)
+
 
 # The number of all messages generated by the LLM.
 # This includes invalid responses and equivalence claims.
@@ -2306,55 +2371,6 @@ def plot_num_completions_before_equivalence_claim_per_outcome():
     return plots
 
 
-# %% Mann-Whitney U Test
-
-
-@block
-def mannwhitneyu_test():
-    grouped_guut_data = data.groupby("preset")
-    guut_groups = {preset: grouped_guut_data.get_group(preset)["cosmic_ray.killed_by_own"] for preset in PRESETS}
-
-    grouped_pynguin_data = pynguin_data.groupby("index")  # pyright: ignore
-    pynguin_groups = {index: grouped_pynguin_data.get_group(index)["killed"] for index in range(1, 31)}
-
-    results = {}
-    results["comparison"] = []
-    for preset in PRESETS:
-        results[f"{preset}_statistic"] = []
-        results[f"{preset}_pvalue"] = []
-
-    for group_name_2, values_2 in (guut_groups | pynguin_groups).items():
-        if isinstance(group_name_2, int):
-            group_name_2 = f"pynguin_{group_name_2}"
-        results["comparison"].append(group_name_2)
-
-        for group_name_1, values_1 in guut_groups.items():
-            result = mannwhitneyu(values_1, values_2)
-            results[f"{group_name_1}_statistic"].append(result.statistic)
-            results[f"{group_name_1}_pvalue"].append(result.pvalue)
-
-    df = pd.DataFrame(results)
-    df.to_csv(OUTPUT_PATH / "mannwhitneyu.csv")
-
-
 # %% sandbox 2
-
-for project in data["project"].unique():
-    lines = [
-        len(coverage_map[(preset, project)].missing_lines) + len(coverage_map[(preset, project)].executed_lines)
-        for preset in PRESETS
-    ]
-    branches = [
-        len(coverage_map[(preset, project)].missing_branches) + len(coverage_map[(preset, project)].executed_branches)
-        for preset in PRESETS
-    ]
-    print(f"{project}: {lines}")
-    print(f"{project}: {branches}")
-
 # %% sandbox 3
-
-pynguin_coverage_map[("apimd", 1)]
-
 # %% sandbox 4
-
-all_seen_lines_map["httpie"]
