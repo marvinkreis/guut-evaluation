@@ -18,6 +18,8 @@ Dataframes:
 - aggregated_pynguin_data
     - TODO: can this be replaced with a simple groupby?
 
+- sample_data
+
 
 Maps:
 
@@ -528,50 +530,51 @@ def read_mutant_results(mutants_file: Path, project: str) -> Dict[MutantId, Cosm
     return {MutantId(project, m[0], m[1], m[2]): CosmicRayInfo(test_outcome_kills(m[3]), m[4]) for m in mutants}
 
 
-cosmic_ray_results = {}
-# Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
-for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
-    results_dir = (mutants_path / ".." / "..").resolve()
-    id = LongId.parse(results_dir.name)
-    cosmic_ray_results[(id.project, id.preset, "exitfirst")] = read_mutant_results(
-        results_dir / "cosmic-ray" / "mutants.sqlite", id.project
+@block
+def add_cosmic_ray_results_to_data():
+    cosmic_ray_results = {}
+
+    # Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
+    for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
+        results_dir = (mutants_path / ".." / "..").resolve()
+        id = LongId.parse(results_dir.name)
+        cosmic_ray_results[(id.project, id.preset, "exitfirst")] = read_mutant_results(
+            results_dir / "cosmic-ray" / "mutants.sqlite", id.project
+        )
+        cosmic_ray_results[(id.project, id.preset, "full")] = read_mutant_results(
+            results_dir / "cosmic-ray-full" / "mutants.sqlite", id.project
+        )
+
+    data["cosmic_ray.killed_by_own"] = data.apply(
+        lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][MutantId.from_row(row)].killed,
+        axis=1,
     )
-    cosmic_ray_results[(id.project, id.preset, "full")] = read_mutant_results(
-        results_dir / "cosmic-ray-full" / "mutants.sqlite", id.project
+    presets = list(data["preset"].unique())
+    data["cosmic_ray.killed_by_any"] = data.apply(
+        lambda row: any(
+            cosmic_ray_results[(row["project"], preset, "exitfirst")][MutantId.from_row(row)].killed
+            for preset in presets
+        ),
+        axis=1,
     )
 
-
-data["cosmic_ray.killed_by_own"] = data.apply(
-    lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][MutantId.from_row(row)].killed,
-    axis=1,
-)
-presets = list(data["preset"].unique())
-data["cosmic_ray.killed_by_any"] = data.apply(
-    lambda row: any(
-        cosmic_ray_results[(row["project"], preset, "exitfirst")][MutantId.from_row(row)].killed for preset in presets
-    ),
-    axis=1,
-)
-
-data["cosmic_ray_full.killed_by_own"] = data.apply(
-    lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][MutantId.from_row(row)].killed,
-    axis=1,
-)
-presets = list(data["preset"].unique())
-data["cosmic_ray_full.killed_by_any"] = data.apply(
-    lambda row: any(
-        cosmic_ray_results[(row["project"], preset, "full")][MutantId.from_row(row)].killed for preset in presets
-    ),
-    axis=1,
-)
-data["cosmic_ray_full.failing_tests"] = data.apply(
-    lambda row: get_failing_tests_for_output(
-        cosmic_ray_results[(row["project"], row["preset"], "full")][MutantId.from_row(row)].output
-    ),
-    axis=1,
-)
-
-del cosmic_ray_results
+    data["cosmic_ray_full.killed_by_own"] = data.apply(
+        lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][MutantId.from_row(row)].killed,
+        axis=1,
+    )
+    presets = list(data["preset"].unique())
+    data["cosmic_ray_full.killed_by_any"] = data.apply(
+        lambda row: any(
+            cosmic_ray_results[(row["project"], preset, "full")][MutantId.from_row(row)].killed for preset in presets
+        ),
+        axis=1,
+    )
+    data["cosmic_ray_full.failing_tests"] = data.apply(
+        lambda row: get_failing_tests_for_output(
+            cosmic_ray_results[(row["project"], row["preset"], "full")][MutantId.from_row(row)].output
+        ),
+        axis=1,
+    )
 
 
 # %% Read Pynguin cosmic-ray results
@@ -678,20 +681,20 @@ class EquivalenceClaim(NamedTuple):
     id: str
 
 
-equivalence_claims = {}
-for index, row in data.iterrows():
-    mutant_id = MutantId.from_row(row)
-    equivalence_claims[mutant_id] = equivalence_claims.get(mutant_id, []) + (
-        [EquivalenceClaim(str(row["preset"]), str(row["id"]))] if bool(row["claimed_equivalent"]) else []
-    )
+@block
+def add_equivalence_claims():
+    equivalence_claims = {}
+    for index, row in data.iterrows():
+        mutant_id = MutantId.from_row(row)
+        equivalence_claims[mutant_id] = equivalence_claims.get(mutant_id, []) + (
+            [EquivalenceClaim(str(row["preset"]), str(row["id"]))] if bool(row["claimed_equivalent"]) else []
+        )
 
-presets = list(data["preset"].unique())
-data["mutant.equivalence_claims"] = data.apply(
-    lambda row: equivalence_claims[MutantId.from_row(row)],
-    axis=1,
-)
-data["mutant.num_equivalence_claims"] = data["mutant.equivalence_claims"].map(len)
-del equivalence_claims
+    data["mutant.equivalence_claims"] = data.apply(
+        lambda row: equivalence_claims[MutantId.from_row(row)],
+        axis=1,
+    )
+    data["mutant.num_equivalence_claims"] = data["mutant.equivalence_claims"].map(len)
 
 
 # %% Helper functions
@@ -786,75 +789,78 @@ data["coverage.missing_branch_ids"] = data.apply(
 
 # %% Count number of mutants per module
 
-num_mutants = {}
 
-for project in data["project"].unique():
-    for target_path in set(data[data["project"] == project]["problem.target_path"]):
-        num_mutants[(project, target_path)] = len(
-            data[
-                (data["project"] == project)
-                & (data["problem.target_path"] == target_path)
-                & (data["preset"] == "debugging_one_shot")
-            ]
-        )
+@block
+def count_mutants_per_module():
+    num_mutants = {}
 
-data["module.num_mutants"] = data.apply(lambda row: num_mutants[(row["project"], row["problem.target_path"])], axis=1)
-del num_mutants
+    for project in data["project"].unique():
+        for target_path in set(data[data["project"] == project]["problem.target_path"]):
+            num_mutants[(project, target_path)] = len(
+                data[
+                    (data["project"] == project)
+                    & (data["problem.target_path"] == target_path)
+                    & (data["preset"] == "debugging_one_shot")
+                ]
+            )
+
+    data["module.num_mutants"] = data.apply(
+        lambda row: num_mutants[(row["project"], row["problem.target_path"])], axis=1
+    )
 
 
 # %% Get number of coverable lines and branches per file
 
+
 # TODO: This doesn't include Pynguin's data
 # TODO: Is this still relevant?
 
-all_lines = {}
-all_line_ids = {}
-all_branches = {}
-all_branch_ids = {}
 
-for project in data["project"].unique():
-    for target_path in set(data[data["project"] == project]["problem.target_path"]):
-        covered = data[
-            (data["project"] == project)
-            & (data["problem.target_path"] == target_path)
-            & (data["coverage.covered_lines"])
-        ]
-        if len(covered):
-            all_lines[(project, target_path)] = (
-                covered.iloc[0]["coverage.covered_lines"] + covered.iloc[0]["coverage.missing_lines"]
-            )
-            all_line_ids[(project, target_path)] = (
-                covered.iloc[0]["coverage.covered_line_ids"] + covered.iloc[0]["coverage.missing_line_ids"]
-            )
-            all_branches[(project, target_path)] = (
-                covered.iloc[0]["coverage.covered_branches"] + covered.iloc[0]["coverage.missing_branches"]
-            )
-            all_branch_ids[(project, target_path)] = (
-                covered.iloc[0]["coverage.covered_branch_ids"] + covered.iloc[0]["coverage.missing_branch_ids"]
-            )
-        else:
-            print(f"No coverage data available for {project} {target_path}")
+@block
+def combine_seen_lines_and_branches():
+    all_lines = {}
+    all_line_ids = {}
+    all_branches = {}
+    all_branch_ids = {}
 
-data["coverage.all_lines"] = data.apply(
-    lambda row: all_lines.get((row["project"], row["problem.target_path"]), []), axis=1
-)
-data["coverage.all_line_ids"] = data.apply(
-    lambda row: all_line_ids.get((row["project"], row["problem.target_path"]), []), axis=1
-)
-data["coverage.num_lines"] = data["coverage.all_lines"].map(len)
+    for project in data["project"].unique():
+        for target_path in set(data[data["project"] == project]["problem.target_path"]):
+            covered = data[
+                (data["project"] == project)
+                & (data["problem.target_path"] == target_path)
+                & (data["coverage.covered_lines"])
+            ]
+            if len(covered):
+                all_lines[(project, target_path)] = (
+                    covered.iloc[0]["coverage.covered_lines"] + covered.iloc[0]["coverage.missing_lines"]
+                )
+                all_line_ids[(project, target_path)] = (
+                    covered.iloc[0]["coverage.covered_line_ids"] + covered.iloc[0]["coverage.missing_line_ids"]
+                )
+                all_branches[(project, target_path)] = (
+                    covered.iloc[0]["coverage.covered_branches"] + covered.iloc[0]["coverage.missing_branches"]
+                )
+                all_branch_ids[(project, target_path)] = (
+                    covered.iloc[0]["coverage.covered_branch_ids"] + covered.iloc[0]["coverage.missing_branch_ids"]
+                )
+            else:
+                print(f"No coverage data available for {project} {target_path}")
 
-data["coverage.all_branches"] = data.apply(
-    lambda row: all_branches.get((row["project"], row["problem.target_path"]), []), axis=1
-)
-data["coverage.all_branch_ids"] = data.apply(
-    lambda row: all_branch_ids.get((row["project"], row["problem.target_path"]), []), axis=1
-)
-data["coverage.num_branches"] = data["coverage.all_branches"].map(len)
+    data["coverage.all_lines"] = data.apply(
+        lambda row: all_lines.get((row["project"], row["problem.target_path"]), []), axis=1
+    )
+    data["coverage.all_line_ids"] = data.apply(
+        lambda row: all_line_ids.get((row["project"], row["problem.target_path"]), []), axis=1
+    )
+    data["coverage.num_lines"] = data["coverage.all_lines"].map(len)
 
-del all_lines
-del all_line_ids
-del all_branches
-del all_branch_ids
+    data["coverage.all_branches"] = data.apply(
+        lambda row: all_branches.get((row["project"], row["problem.target_path"]), []), axis=1
+    )
+    data["coverage.all_branch_ids"] = data.apply(
+        lambda row: all_branch_ids.get((row["project"], row["problem.target_path"]), []), axis=1
+    )
+    data["coverage.num_branches"] = data["coverage.all_branches"].map(len)
 
 
 # %% Compute Token Usage
@@ -1567,13 +1573,13 @@ column_mapping = {
 }
 
 sampled_mutants["claim1"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
-    lambda l: l[0].id if len(l) > 0 else None
+    lambda claims: claims[0].id if len(claims) > 0 else None
 )
 sampled_mutants["claim2"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
-    lambda l: l[1].id if len(l) > 1 else None
+    lambda claims: claims[1].id if len(claims) > 1 else None
 )
 sampled_mutants["claim3"] = cast(pd.Series, sampled_mutants["mutant.equivalence_claims"]).map(
-    lambda l: l[2].id if len(l) > 2 else None
+    lambda claims: claims[2].id if len(claims) > 2 else None
 )
 
 sampled_mutants = cast(pd.DataFrame, sampled_mutants).sort_values(
@@ -1784,10 +1790,6 @@ def plot_percentage_of_direct_kills():
                     len(target_data[target_data["cosmic_ray.killed_by_any"]]) / len(target_data),
                 ]
             )
-
-    color1 = cmap_colors[0]
-    color3 = cmap_colors[1]
-    color2 = ((color1[0] + color3[0]) / 2, (color1[1] + color3[1]) / 2, (color1[2] + color3[2]) / 2)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
     x = np.arange(len(ticks))
