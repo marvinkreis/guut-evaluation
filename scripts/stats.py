@@ -51,6 +51,7 @@ from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, Callable
+from scipy.stats import mannwhitneyu
 
 import matplotlib.pylab as plt
 import numpy as np
@@ -150,6 +151,8 @@ FAIL = "fail"
 
 OUTCOMES = [SUCCESS, EQUIVALENT, FAIL]
 OUTCOME_NAMES = ["Success", "Claimed Equivalent", "Failed"]
+
+AGGS = ["mean", "median", "min", "max", "sum"]
 
 
 # %% Helpers
@@ -1254,8 +1257,10 @@ with open("/proc/self/status") as f:
 
 
 cols = list(data.columns)
-mid = int(((len(cols) + 1) // 2))
-for x, y in zip(cols[:mid] + [""], cols[mid:] + [""]):
+mid1 = int(((len(cols) + 1) // 3))
+mid2 = int(((len(cols) + 1) // 3) * 2)
+for x, y, z in zip(cols[:mid1] + [""], cols[mid1:mid2] + [""], cols[mid2:] + [""]):
+    print(f"{x:<40} {y:<40} {z}")
 
 # %% Misc Plots and Data
 # ======================================================================================================================
@@ -1517,8 +1522,8 @@ data[data["claimed_equivalent"]].sample(n=10, random_state=1)["long_id"]
 
 
 print(f"Directly killed mutants: {len(data[data["mutant_killed"]])}")
-print(f"Mutants killed by tests from the same run: {len(data[data["cosmic_ray.killed_by_own"]])}")
-print(f"Mutants killed by tests from the any run: {len(data[data["cosmic_ray.killed_by_any"]])}")
+print(f"Mutants killed by tests from the same run: {len(data[data["cosmic_ray_full.killed_by_own"]])}")
+print(f"Mutants killed by tests from the any run: {len(data[data["cosmic_ray_full.killed_by_any"]])}")
 
 
 # %% Equivalent mutants
@@ -1526,10 +1531,10 @@ print(f"Mutants killed by tests from the any run: {len(data[data["cosmic_ray.kil
 
 print(f"Equivalence-claimed mutants: {len(data[data["claimed_equivalent"]])}")
 print(
-    f"Equivalence-claimed mutants not killed by test from same run: {len(data[data["claimed_equivalent"] & ~data["cosmic_ray.killed_by_own"]])}"
+    f"Equivalence-claimed mutants not killed by test from same run: {len(data[data["claimed_equivalent"] & ~data["cosmic_ray_full.killed_by_own"]])}"
 )
 print(
-    f"Equivalence-claimed mutants not killed by test from any run: {len(data[data["claimed_equivalent"] & ~data["cosmic_ray.killed_by_any"]])}"
+    f"Equivalence-claimed mutants not killed by test from any run: {len(data[data["claimed_equivalent"] & ~data["cosmic_ray_full.killed_by_any"]])}"
 )
 
 
@@ -1553,7 +1558,8 @@ for preset in data["preset"].unique():
     for project in data["project"].unique():
         target_data = data[(data["project"] == project) & (data["preset"] == preset)]
         claims_unkilled = cast(
-            pd.DataFrame, target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray.killed_by_any"]]
+            pd.DataFrame,
+            target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray_full.killed_by_any"]],
         )
         killed_by_1 = len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 1])
         killed_by_2 = len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 2])
@@ -1567,7 +1573,8 @@ for preset in data["preset"].unique():
 for project in data["project"].unique():
     target_data = data[(data["project"] == project)]
     claims_unkilled = cast(
-        pd.DataFrame, target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray.killed_by_any"]]
+        pd.DataFrame,
+        target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray_full.killed_by_any"]],
     )
     print(
         f"{project:<20} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 1]):3} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 2])//4:3} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 3])//4:3}"
@@ -1579,7 +1586,7 @@ for project in data["project"].unique():
 
 for num_claims in [0, 1, 2, 3]:
     percentage = len(
-        data[(data["mutant.num_equivalence_claims"] == num_claims) & (~data["cosmic_ray.killed_by_any"])]
+        data[(data["mutant.num_equivalence_claims"] == num_claims) & (~data["cosmic_ray_full.killed_by_any"])]
     ) / len(data[data["mutant.num_equivalence_claims"] == num_claims])
     print(f"{percentage * 100:5.2f}% of mutants with {num_claims} claims weren't killed by any test")
 
@@ -1587,11 +1594,11 @@ for num_claims in [0, 1, 2, 3]:
 # %% Anomalies
 
 
-data[data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].apply(
+data[data["cosmic_ray_full.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]].apply(
     lambda row: (row["preset"], row["mutant_id"].project), axis=1
 ).unique()
-# data[["mutant_id"]][data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]]
-# (data["cosmic_ray.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]).value_counts()
+# data[["mutant_id"]][data["cosmic_ray_full.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]]
+# (data["cosmic_ray_full.killed_by_own"] != data["cosmic_ray_full.killed_by_own"]).value_counts()
 
 
 # %% Overview over sampled mutants
@@ -1718,8 +1725,8 @@ def plot_percentage_of_direct_kills():
             percentages.append(
                 [
                     len(target_data[target_data["mutant_killed"]]) / len(target_data),
-                    len(target_data[target_data["cosmic_ray.killed_by_own"]]) / len(target_data),
-                    len(target_data[target_data["cosmic_ray.killed_by_any"]]) / len(target_data),
+                    len(target_data[target_data["cosmic_ray_full.killed_by_own"]]) / len(target_data),
+                    len(target_data[target_data["cosmic_ray_full.killed_by_any"]]) / len(target_data),
                 ]
             )
 
@@ -1762,17 +1769,17 @@ def plot_percentage_of_equivalence_claims():
     percentages_killed = []
     percentages_unkilled = []
 
-    for preset in data["settings.preset_name"].unique():
+    for preset in PRESETS:
         if preset == "baseline_without_iterations":
             continue
 
         for project in data["project"].unique():
-            target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
+            target_data = data[(data["project"] == project) & (data["preset"] == preset)]
             claims_unkilled = target_data[
-                (target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray.killed_by_any"]
+                (target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray_full.killed_by_any"]
             ]
             claims_killed = target_data[
-                (target_data["outcome"] == EQUIVALENT) & target_data["cosmic_ray.killed_by_any"]
+                (target_data["outcome"] == EQUIVALENT) & target_data["cosmic_ray_full.killed_by_any"]
             ]
             ticks.append(f"{project} {preset}")
             percentages_killed.append(len(claims_killed) / len(target_data))
@@ -1814,9 +1821,11 @@ def plot_percentage_of_failed_runs():
         for project in data["project"].unique():
             target_data = data[(data["project"] == project) & (data["settings.preset_name"] == preset)]
             failed_runs_unkilled = target_data[
-                (target_data["outcome"] == FAIL) & ~target_data["cosmic_ray.killed_by_any"]
+                (target_data["outcome"] == FAIL) & ~target_data["cosmic_ray_full.killed_by_any"]
             ]
-            failed_runs_killed = target_data[(target_data["outcome"] == FAIL) & target_data["cosmic_ray.killed_by_any"]]
+            failed_runs_killed = target_data[
+                (target_data["outcome"] == FAIL) & target_data["cosmic_ray_full.killed_by_any"]
+            ]
             ticks.append(f"{project} {preset}")
             percentages_killed.append(len(failed_runs_killed) / len(target_data))
             percentages_unkilled.append(len(failed_runs_unkilled) / len(target_data))
@@ -1840,6 +1849,70 @@ def plot_percentage_of_failed_runs():
     return fig
 
 
+# %% Write stats
+# ======================================================================================================================
+
+
+@block
+def write_stats():
+    cols = [
+        "usage.cached_tokens",
+        "usage.uncached_prompt_tokens",
+        "usage.completion_tokens",
+        "usage.cost.cached_tokens",
+        "usage.cost.uncached_prompt_tokens",
+        "usage.cost.completion_tokens",
+        "usage.cost",
+        "mutant_killed",
+        "claimed_equivalent",
+        "aborted",
+        "cosmic_ray_full.killed_by_own",
+        "cosmic_ray_full.killed_by_any",
+        "exit_code_diff",
+        "output_diff",
+        "mutant_covered.by_experiment",
+        "mutant_covered.by_test",
+        "mutant_covered",
+        "num_experiments",
+        "num_tests",
+        "num_turns",
+        "num_turns_before_equivalence_claim",
+        "num_completions",
+        "num_completions_before_equivalence_claim",
+        "num_invalid_experiments",
+        "num_invalid_tests",
+        "num_incomplete_responses",
+        "num_experiment_import_errors",
+        "num_test_import_errors",
+    ]
+    agg_stats = data[cols + ["preset", "project"]].copy()
+    agg_stats["coverage.line_coverage_for_module"] = data["coverage.covered_line_ids"].map(len) / (
+        data["coverage.covered_line_ids"].map(len) + data["coverage.missing_line_ids"].map(len)
+    )
+    agg_stats["coverage.branch_coverage_for_module"] = data["coverage.covered_branch_ids"].map(len) / (
+        data["coverage.covered_branch_ids"].map(len) + data["coverage.missing_branch_ids"].map(len)
+    )
+    for col in cols:
+        agg_stats[col] = agg_stats[col].astype("float64")
+
+    agg_stats.fillna(0, inplace=True)
+    Path("/mnt/temp/asdf.txt").write_text(
+        agg_stats[(agg_stats["preset"] == "baseline_with_iterations") & (agg_stats["project"] == "flutes")]
+        .groupby(["preset", "project"])
+        .agg(AGGS)
+        .to_string()
+    )
+    agg_stats.groupby("preset")[cols].agg(AGGS).transpose().to_csv(
+        OUTPUT_PATH / 'data.groupby("preset").agg().tsv', sep="\t"
+    )
+    agg_stats.groupby(["preset", "project"]).sum().groupby("preset")[cols].agg(AGGS).transpose().to_csv(
+        OUTPUT_PATH / 'data.groupby("preset", "project").sum().groupby("preset").agg().tsv', sep="\t"
+    )
+    agg_stats.groupby(["preset", "project"])[cols].agg(AGGS).transpose().to_csv(
+        OUTPUT_PATH / 'data.groupby("preset", "project").agg().tsv', sep="\t"
+    )
+
+
 # %% Paper RQ 1: How does our approach perform compared to Pynguin?
 # ======================================================================================================================
 
@@ -1856,7 +1929,7 @@ class ____Usage:  # mark this in the outline
     pass
 
 
-token_cols = [
+usage_cols = [
     "usage.cached_tokens",
     "usage.uncached_prompt_tokens",
     "usage.completion_tokens",
@@ -1870,19 +1943,21 @@ token_cols = [
 # %% Mean usage for a single mutant
 
 
-data.groupby("preset")[token_cols].mean()
-
+data.groupby(["preset", "project"])[usage_cols].agg(AGGS).transpose().to_csv(
+    OUTPUT_PATH / "token_usage_per_project.csv"
+)
 
 # %% Mean usage mean for a single project (1000 or fewer mutants)
 
 
-data.groupby(["preset", "project"])[token_cols].sum().groupby("preset").mean()
-
+data.groupby(["preset", "project"])[usage_cols].sum().groupby("preset").agg(AGGS).transpose().to_csv(
+    OUTPUT_PATH / "token_usage_per_project.csv"
+)
 
 # %% Total usage
 
 
-data[token_cols].sum()
+data[usage_cols].sum()
 
 
 # %% Plot mean cost per preset and project
@@ -2125,7 +2200,7 @@ def plot_mean_mutation_scores():
     return plot_bar_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
-        [("Mutation Score", lambda df: df["cosmic_ray.killed_by_own"].sum() / len(df))],
+        [("Mutation Score", lambda df: df["cosmic_ray_full.killed_by_own"].sum() / len(df))],
         customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.0f}%"),
     )
 
@@ -2139,15 +2214,7 @@ def plot_mean_mutation_score_with_pynguin():
     values = []
     for preset in PRESETS:
         group = data[data["preset"] == preset]
-        values.append(group["cosmic_ray.killed_by_own"].sum())
-
-    # num_pynguin_killed = 0
-    # for project, run in best_pynguin_runs.items():
-    #     best_run_for_project_data = pynguin_data[
-    #         (pynguin_data["project"] == project) & (pynguin_data["index"] == run.index_)
-    #     ]  # pyright: ignore
-    #     num_pynguin_killed += best_run_for_project_data["killed"].sum()  # pyright: ignore
-    # values.append(num_pynguin_killed)
+        values.append(group["cosmic_ray_full.killed_by_own"].sum())
 
     values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_best"].sum())
     values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_any"].sum())
@@ -2170,7 +2237,7 @@ def plot_mean_mutation_score_with_pynguin():
 @block
 def mannwhitneyu_test():
     grouped_guut_data = data.groupby("preset")
-    guut_groups = {preset: grouped_guut_data.get_group(preset)["cosmic_ray.killed_by_own"] for preset in PRESETS}
+    guut_groups = {preset: grouped_guut_data.get_group(preset)["cosmic_ray_full.killed_by_own"] for preset in PRESETS}
 
     grouped_pynguin_data = pynguin_data.groupby("index")  # pyright: ignore
     pynguin_groups = {index: grouped_pynguin_data.get_group(index)["killed"] for index in range(1, 31)}
