@@ -33,6 +33,10 @@
 #     - Each entry contains the coverage for an entire test suite for one project.
 #     - Indexed by ("project", "index") where 1 <= index <= 30.
 #
+# - pynguin_num_tests_map
+#     - Contains the number of Pynguin-generated tests for each EMSE project.
+#     - Indexed by ("project", "index") where 1 <= index <= 30.
+#
 # - all_seen_lines_map / all_seen_branches_map
 #     - Contains all (executed or missing) lines/branches from coverage.py for each EMSE project.
 #     - Each entry contains a set of lines of one project.
@@ -177,12 +181,24 @@ def savefig(function):
             fig = retval
             fig.savefig(OUTPUT_PATH / f"{function.__name__}.png")
             fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf")
+        elif isinstance(retval, Tuple):
+            fig, obj = retval
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.png")
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf")
+            (OUTPUT_PATH / f"{function.__name__}.json").write_text(json.dumps(obj))
 
         if isinstance(retval, list):
             for index, entry in enumerate(retval):
                 fig = entry
-                fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
-                fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
+                if isinstance(entry, Figure):
+                    fig = entry
+                    fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
+                    fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
+                elif isinstance(entry, Tuple):
+                    fig, obj = entry
+                    fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
+                    fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
+                    (OUTPUT_PATH / f"{function.__name__}.json").write_text(json.dumps(obj))
 
     return outer_function
 
@@ -441,6 +457,9 @@ class Coverage(NamedTuple):
     executed_lines: List[LineId]
     missing_branches: List[BranchId]
     executed_branches: List[BranchId]
+
+
+EMPTY_COVERAGE = Coverage(executed_branches=[], missing_branches=[], executed_lines=[], missing_lines=[])
 
 
 def read_coverage_py_json(coverage_json: JsonObj) -> Coverage:
@@ -1727,6 +1746,27 @@ def plot_violin_per_group(
     return fig
 
 
+def mannwhitneyu_test(values, names, filename):
+    results = {}
+    results["comparison"] = []
+    for name in names:
+        results[f"{name}_statistic"] = []
+        results[f"{name}_pvalue"] = []
+
+    for group_name_2, values_2 in zip(names, values):
+        if isinstance(group_name_2, int):
+            group_name_2 = f"pynguin_{group_name_2}"
+        results["comparison"].append(group_name_2)
+
+        for group_name_1, values_1 in zip(names, values):
+            result = mannwhitneyu(values_1, values_2)
+            results[f"{group_name_1}_statistic"].append(result.statistic)
+            results[f"{group_name_1}_pvalue"].append(result.pvalue)
+
+    df = pd.DataFrame(results)
+    df.to_csv(OUTPUT_PATH / filename)
+
+
 # %% Shelved Plots and Data
 # ======================================================================================================================
 
@@ -1967,16 +2007,16 @@ usage_cols = [
 # %% Mean usage for a single mutant
 
 
-data.groupby(["preset", "project"])[usage_cols].agg(AGGS).transpose().to_csv(
-    OUTPUT_PATH / "token_usage_per_project.csv"
-)
+# data.groupby(["preset", "project"])[usage_cols].agg(AGGS).transpose().to_csv(
+#     OUTPUT_PATH / "token_usage_per_mutant.csv"
+# )
 
 # %% Mean usage mean for a single project (1000 or fewer mutants)
 
 
-data.groupby(["preset", "project"])[usage_cols].sum().groupby("preset").agg(AGGS).transpose().to_csv(
-    OUTPUT_PATH / "token_usage_per_project.csv"
-)
+# data.groupby(["preset", "project"])[usage_cols].sum().groupby("preset").agg(AGGS).transpose().to_csv(
+#     OUTPUT_PATH / "token_usage_per_project.csv"
+# )
 
 # %% Total usage
 
@@ -2097,7 +2137,7 @@ class ____Coverage:  # mark this in the outline
 # %% Plot mean line coverage
 
 
-@block
+# @block
 @savefig
 def plot_mean_line_coverage():
     def get_coverage_for_group(df):
@@ -2121,7 +2161,7 @@ def plot_mean_line_coverage():
 # %% Plot mean branch coverage
 
 
-@block
+# @block
 @savefig
 def plot_mean_branch_coverage():
     def get_coverage_for_group(df):
@@ -2142,7 +2182,7 @@ def plot_mean_branch_coverage():
     )
 
 
-# %% Plot mean line coverage with best Pynguin run
+# %% Plot mean line coverage with Pynguin
 
 # TODO: combined pynguin coverage
 # TODO: avg Pynguin coverage
@@ -2158,29 +2198,76 @@ def plot_mean_line_coverage_with_pynguin():
             num_covered += len(coverage_map[(preset, project)].executed_lines)
         values.append(num_covered)
 
-    num_pynguin_covered = 0
-    for project in PROJECTS:
-        if is_pynguin_project_excluded(project):
-            continue
+    # Pynguin runs with the best MS
+    # num_best_ms_pynguin_covered = 0
+    # for project in PROJECTS:
+    #     if is_pynguin_project_excluded(project):
+    #         continue
 
-        best_index = best_pynguin_runs[project].index_
-        num_pynguin_covered += len(pynguin_coverage_map[(project, best_index)].executed_lines)
-    values.append(num_pynguin_covered)
+    #     best_index = best_pynguin_runs[project].index_
+    #     num_best_ms_pynguin_covered += len(pynguin_coverage_map[(project, best_index)].executed_lines)
+    # values.append(num_best_ms_pynguin_covered)
+
+    # Pynguin runs with the best coverage
+    # num_best_cov_pynguin_covered = 0
+    # for project in PROJECTS:
+    #     num_covered_lines_per_project = 0
+
+    #     for index in range(1, 31):
+    #         coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+    #         num_covered_lines_per_project = max(num_covered_lines_per_project, len(coverage.executed_lines))
+
+    #     num_best_cov_pynguin_covered += num_covered_lines_per_project
+    # values.append(num_best_cov_pynguin_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = 0
+    for project in PROJECTS:
+        covered_lines_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_lines_per_project.update(coverage.executed_lines)
+
+        num_combined_pynguin_covered += len(covered_lines_per_project)
+    values.append(num_combined_pynguin_covered)
+
+    # Pynguin avg runs
+    num_avg_pynguin_covered = 0
+    for project in PROJECTS:
+        num_covered_lines_per_project = 0
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_covered_lines_per_project += len(coverage.executed_lines)
+
+        num_avg_pynguin_covered += num_covered_lines_per_project / get_num_pynguin_runs_per_project(project)
+    values.append(num_avg_pynguin_covered)
 
     values = np.array(values) / sum([len(branches) for branches in all_seen_lines_map.values()])
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    ax.bar(x=np.arange(5), height=values)
+    ax.bar(x=np.arange(len(values)), height=values)
 
-    ax.set_xticks(np.arange(5))
-    ax.set_xticklabels(PRESET_NAMES + ["Pynguin (best run)"], rotation=90)
+    labels = PRESET_NAMES + [
+        # "Pynguin (best run by MS)",
+        # "Pynguin (best run by line coverage)",
+        "Pynguin (combined)",
+        "Pynguin (average)",
+    ]
+
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(
+        labels,
+        rotation=90,
+    )
     fig.legend(["Line Coverage"], loc="lower left")
     ax.yaxis.set_major_formatter(format_perecent())
 
-    return fig
+    return fig, list(zip(labels, values))
 
 
-# %% Plot mean branch coverage with best Pynguin run
+# %% Plot mean branch coverage with Pynguin
 
 
 @block
@@ -2193,26 +2280,153 @@ def plot_mean_branch_coverage_with_pynguin():
             num_covered += len(coverage_map[(preset, project)].executed_branches)
         values.append(num_covered)
 
-    num_pynguin_covered = 0
-    for project in PROJECTS:
-        if is_pynguin_project_excluded(project):
-            continue
+    # Pynguin runs with the best MS
+    # num_best_ms_pynguin_covered = 0
+    # for project in PROJECTS:
+    #     if is_pynguin_project_excluded(project):
+    #         continue
 
-        best_index = best_pynguin_runs[project].index_
-        num_pynguin_covered += len(pynguin_coverage_map[(project, best_index)].executed_branches)
-    values.append(num_pynguin_covered)
+    #     best_index = best_pynguin_runs[project].index_
+    #     num_best_ms_pynguin_covered += len(pynguin_coverage_map[(project, best_index)].executed_branches)
+    # values.append(num_best_ms_pynguin_covered)
+
+    # Pynguin runs with the best coverage
+    # num_best_cov_pynguin_covered = 0
+    # for project in PROJECTS:
+    #     num_covered_branches_per_project = 0
+
+    #     for index in range(1, 31):
+    #         coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+    #         num_covered_branches_per_project = max(num_covered_branches_per_project, len(coverage.executed_branches))
+
+    #     num_best_cov_pynguin_covered += num_covered_branches_per_project
+    # values.append(num_best_cov_pynguin_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = 0
+    for project in PROJECTS:
+        covered_branches_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_branches_per_project.update(coverage.executed_branches)
+
+        num_combined_pynguin_covered += len(covered_branches_per_project)
+    values.append(num_combined_pynguin_covered)
+
+    # Pynguin avg runs
+    num_avg_pynguin_covered = 0
+    for project in PROJECTS:
+        num_covered_branches_per_project = 0
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_covered_branches_per_project += len(coverage.executed_branches)
+
+        num_avg_pynguin_covered += num_covered_branches_per_project / get_num_pynguin_runs_per_project(project)
+    values.append(num_avg_pynguin_covered)
 
     values = np.array(values) / sum([len(branches) for branches in all_seen_branches_map.values()])
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    ax.bar(x=np.arange(5), height=values)
+    ax.bar(x=np.arange(len(values)), height=values)
 
-    ax.set_xticks(np.arange(5))
-    ax.set_xticklabels(PRESET_NAMES + ["Pynguin (best run)"], rotation=90)
+    labels = PRESET_NAMES + [
+        # "Pynguin (best run by mutation score)",
+        # "Pynguin (best run by branch coverage)",
+        "Pynguin (combined)",
+        "Pynguin (average)",
+    ]
+
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(
+        labels,
+        rotation=90,
+    )
 
     fig.legend(["Branch Coverage"], loc="lower left")
     ax.yaxis.set_major_formatter(format_perecent())
-    return fig
+    return fig, list(zip(labels, values))
+
+
+# %% Mann Whitney U test with plot values from mean line coverage plot
+
+
+@block
+def line_coverage_mannwhitneyu_test():
+    values = []
+    for preset in PRESETS:
+        num_covered = []
+        for project in PROJECTS:
+            num_covered.append(len(coverage_map[(preset, project)].executed_lines))
+        values.append(num_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = []
+    for project in PROJECTS:
+        covered_lines_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_lines_per_project.update(coverage.executed_lines)
+
+        num_combined_pynguin_covered.append(len(covered_lines_per_project))
+    values.append(num_combined_pynguin_covered)
+
+    # Pynguin avg runs
+    num_avg_pynguin_covered = []
+    for project in PROJECTS:
+        num_covered_lines_per_project = 0
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_covered_lines_per_project += len(coverage.executed_lines)
+
+        num_avg_pynguin_covered.append(num_covered_lines_per_project / get_num_pynguin_runs_per_project(project))
+    values.append(num_avg_pynguin_covered)
+
+    names = PRESETS + ["pynguin_combined", "pynguin_avg"]
+    mannwhitneyu_test(values, names, "mannwhitneyu_line_coverage.csv")
+
+
+# %% Mann Whitney U test with plot values from mean branch coverage plot
+
+
+@block
+def branch_coverage_mannwhitneyu_test():
+    values = []
+    for preset in PRESETS:
+        num_covered = []
+        for project in PROJECTS:
+            num_covered.append(len(coverage_map[(preset, project)].executed_branches))
+        values.append(num_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = []
+    for project in PROJECTS:
+        covered_branches_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_branches_per_project.update(coverage.executed_branches)
+
+        num_combined_pynguin_covered.append(len(covered_branches_per_project))
+    values.append(num_combined_pynguin_covered)
+
+    # Pynguin avg runs
+    num_avg_pynguin_covered = []
+    for project in PROJECTS:
+        num_covered_branches_per_project = 0
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_covered_branches_per_project += len(coverage.executed_branches)
+
+        num_avg_pynguin_covered.append(num_covered_branches_per_project / get_num_pynguin_runs_per_project(project))
+    values.append(num_avg_pynguin_covered)
+
+    names = PRESETS + ["pynguin_combined", "pynguin_avg"]
+    mannwhitneyu_test(values, names, "mannwhitneyu_branch_coverage.csv")
 
 
 # %% Mutation score
@@ -2237,7 +2451,7 @@ def plot_mean_mutation_scores():
     )
 
 
-# %% Plot mean mutation scores with best Pynguin run
+# %% Plot mean mutation scores with Pynguin
 
 
 @block
@@ -2258,9 +2472,10 @@ def plot_mean_mutation_score_with_pynguin():
                 return 0
         return num_kills / num_runs
 
-    # values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_best"].sum())
-    values.append(data[data["preset"] == PRESETS[0]].apply(get_avg_kills_for_mutant, axis=1).sum())
+    # values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_best"].sum()) # combined best runs
+    # values.append(pynguin_data[pynguin_data["index"] == 2]["killed"].sum()) # individual run
     values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_any"].sum())
+    values.append(data[data["preset"] == PRESETS[0]].apply(get_avg_kills_for_mutant, axis=1).sum())
 
     values = np.array(values) / len(data[data["preset"] == PRESETS[0]])
 
@@ -2268,11 +2483,80 @@ def plot_mean_mutation_score_with_pynguin():
     ax.bar(x=np.arange(6), height=values)
 
     ax.set_xticks(np.arange(6))
-    ax.set_xticklabels(PRESET_NAMES + ["Pynguin (average)", "Pynguin (combined)"], rotation=90)
+
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (average)"]
+    ax.set_xticklabels(labels, rotation=90)
 
     fig.legend(["Mutation Score"], loc="lower left")
     ax.yaxis.set_major_formatter(format_perecent())
-    return fig
+
+    return fig, list(zip(labels, values))
+
+
+# %% Mann Whitney U test with values from mean mutation scores plot
+
+
+@block
+def mutation_scores_mannwhitneyu_test():
+    values = []
+    for preset in PRESETS:
+        group = data[data["preset"] == preset]
+        values.append(list(group["cosmic_ray_full.killed_by_own"]))
+
+    def get_avg_kills_for_mutant(row):
+        num_runs = get_num_pynguin_runs_per_project(row["project"])
+        num_kills = row["pynguin.cosmic_ray.num_kills"]
+        if num_runs == 0:
+            if num_kills != 0:
+                raise Exception("shouldn't happen")
+            else:
+                return 0
+        return num_kills / num_runs
+
+    values.append(list(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_any"]))
+    values.append(list(data[data["preset"] == PRESETS[0]].apply(get_avg_kills_for_mutant, axis=1)))
+
+    names = PRESETS + ["pynguin_combined", "pynguin_avg"]
+    mannwhitneyu_test(values, names, "mannwhitneyu_mutation_scores.csv")
+
+
+# %% Mann Whitney U test with values from mean mutation scores plot, grouped by project
+
+
+@block
+def mutation_scores_per_project_mannwhitneyu_test():
+    values = []
+    for preset in PRESETS:
+        kills_per_project = []
+        for project in PROJECTS:
+            group = data[(data["preset"] == preset) & (data["project"] == project)]
+            kills_per_project.append(group["cosmic_ray_full.killed_by_own"].sum())
+        values.append(kills_per_project)
+
+    def get_avg_kills_for_mutant(row):
+        num_runs = get_num_pynguin_runs_per_project(row["project"])
+        num_kills = row["pynguin.cosmic_ray.num_kills"]
+        if num_runs == 0:
+            if num_kills != 0:
+                raise Exception("shouldn't happen")
+            else:
+                return 0
+        return num_kills / num_runs
+
+    combined_pynguin_kills_per_project = []
+    for project in PROJECTS:
+        group = data[(data["preset"] == PRESETS[0]) & (data["project"] == project)]
+        combined_pynguin_kills_per_project.append(group["pynguin.cosmic_ray.killed_by_any"].sum())
+    values.append(combined_pynguin_kills_per_project)
+
+    avg_pynguin_kills_per_project = []
+    for project in PROJECTS:
+        group = data[(data["preset"] == PRESETS[0]) & (data["project"] == project)]
+        avg_pynguin_kills_per_project.append(group.apply(get_avg_kills_for_mutant, axis=1).sum())
+    values.append(avg_pynguin_kills_per_project)
+
+    names = PRESETS + ["pynguin_combined", "pynguin_avg"]
+    mannwhitneyu_test(values, names, "mannwhitneyu_mutation_scores_per_project.csv")
 
 
 # %% Plot number of killed mutants with best Pynguin run
@@ -2305,31 +2589,17 @@ def plot_number_of_killed_mutants_with_pynguin():
 
 
 @block
-def mannwhitneyu_test():
+def killed_mutants_mannwhitneyu_test():
     grouped_guut_data = data.groupby("preset")
     guut_groups = {preset: grouped_guut_data.get_group(preset)["cosmic_ray_full.killed_by_own"] for preset in PRESETS}
 
     grouped_pynguin_data = pynguin_data.groupby("index")  # pyright: ignore
-    pynguin_groups = {index: grouped_pynguin_data.get_group(index)["killed"] for index in range(1, 31)}
+    pynguin_groups = [grouped_pynguin_data.get_group(index)["killed"] for index in range(1, 31)]
 
-    results = {}
-    results["comparison"] = []
-    for preset in PRESETS:
-        results[f"{preset}_statistic"] = []
-        results[f"{preset}_pvalue"] = []
+    names = PRESETS + [f"pynguin_{i}" for i in range(30)]
+    values = [guut_groups[p] for p in PRESETS] + pynguin_groups
 
-    for group_name_2, values_2 in (guut_groups | pynguin_groups).items():
-        if isinstance(group_name_2, int):
-            group_name_2 = f"pynguin_{group_name_2}"
-        results["comparison"].append(group_name_2)
-
-        for group_name_1, values_1 in guut_groups.items():
-            result = mannwhitneyu(values_1, values_2)
-            results[f"{group_name_1}_statistic"].append(result.statistic)
-            results[f"{group_name_1}_pvalue"].append(result.pvalue)
-
-    df = pd.DataFrame(results)
-    df.to_csv(OUTPUT_PATH / "mannwhitneyu.csv")
+    mannwhitneyu_test(values, names, "mannwhitneyu_killed_mutants.csv")
 
 
 # %% Paper RQ 2: Can our approach reliably detect equivalent mutants
