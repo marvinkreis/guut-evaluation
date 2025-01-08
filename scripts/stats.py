@@ -97,10 +97,10 @@ PRESETS = [
 ]
 
 PRESET_NAMES = [
-    "Baseline w/o iterations",
-    "Baseline w/ iterations",
-    "Scientific Debugging (0-shot)",
-    "Scientific Debugging (1-shot)",
+    "Baseline",
+    "Iterative",
+    "Scientific (0-shot)",
+    "Scientific (1-shot)",
 ]
 
 PROJECTS = [
@@ -210,6 +210,17 @@ def is_pynguin_project_excluded(project):
     return project == "pdir2"
 
 
+def get_num_pynguin_runs_per_project(project: str):
+    if project == "flutils":
+        return 30 - 4
+    elif project == "flake8":
+        return 30 - 1
+    elif project == "apimd":
+        return 30 - 1
+    else:
+        return 30
+
+
 # %% Parse info from the results directory name
 
 
@@ -227,6 +238,13 @@ class LongId(NamedTuple):
         project = PACKAGE_TO_PROJECT[package]
         id = parts[-1]
         return LongId(preset, package, project, id)
+
+
+# %% Format floats
+
+
+def format_perecent(digits=0):
+    return lambda num, pos: f"{num * 100:.{digits}f}%"
 
 
 # %% Read and prepare data
@@ -673,6 +691,7 @@ aggregated_pynguin_data = pd.DataFrame(aggregated_pynguin_data)
 class PynguinCosmicRayMutantStatus(NamedTuple):
     killed_by_best: bool
     killed_by_any: bool
+    num_kills: int
 
 
 pynguin_mutant_statuses: Dict[MutantId, PynguinCosmicRayMutantStatus] = {}
@@ -684,20 +703,27 @@ for index, row in pynguin_data.iterrows():
 
     is_best_run = best_pynguin_runs[project].index_ == index
 
-    current_status = pynguin_mutant_statuses.get(mutant_id, PynguinCosmicRayMutantStatus(False, False))
+    current_status = pynguin_mutant_statuses.get(mutant_id, PynguinCosmicRayMutantStatus(False, False, 0))
     killed_by_best = current_status.killed_by_best or (is_best_run and killed)
     killed_by_any = current_status.killed_by_any or killed
+    num_kills = current_status.num_kills + (1 if killed else 0)
 
-    pynguin_mutant_statuses[mutant_id] = PynguinCosmicRayMutantStatus(killed_by_best, killed_by_any)
+    pynguin_mutant_statuses[mutant_id] = PynguinCosmicRayMutantStatus(killed_by_best, killed_by_any, num_kills)
 
 data["pynguin.cosmic_ray.killed_by_best"] = data.apply(
     lambda row: pynguin_mutant_statuses.get(
-        row["mutant_id"], PynguinCosmicRayMutantStatus(False, False)
+        row["mutant_id"], PynguinCosmicRayMutantStatus(False, False, 0)
     ).killed_by_best,
     axis=1,
 )
 data["pynguin.cosmic_ray.killed_by_any"] = data.apply(
-    lambda row: pynguin_mutant_statuses.get(row["mutant_id"], PynguinCosmicRayMutantStatus(False, False)).killed_by_any,
+    lambda row: pynguin_mutant_statuses.get(
+        row["mutant_id"], PynguinCosmicRayMutantStatus(False, False, 0)
+    ).killed_by_any,
+    axis=1,
+)
+data["pynguin.cosmic_ray.num_kills"] = data.apply(
+    lambda row: pynguin_mutant_statuses.get(row["mutant_id"], PynguinCosmicRayMutantStatus(False, False, 0)).num_kills,
     axis=1,
 )
 
@@ -1747,7 +1773,7 @@ def plot_percentage_of_direct_kills():
     )
     ax.set_xticks(x)
     ax.set_xticklabels(ticks, rotation=90)
-    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
+    ax.yaxis.set_major_formatter(format_perecent())
     ax.legend(
         [bar3, bar2, bar1],
         [
@@ -1796,7 +1822,7 @@ def plot_percentage_of_equivalence_claims():
     )
     ax.set_xticks(x)
     ax.set_xticklabels(ticks, rotation=90)
-    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
+    ax.yaxis.set_major_formatter(format_perecent())
     ax.legend(
         [bar1, bar2],
         ["Mutants claimed equivalent (not killed by any test)", "Mutants claimed equivalent (killed by some test)"],
@@ -1841,7 +1867,7 @@ def plot_percentage_of_failed_runs():
     )
     ax.set_xticks(x)
     ax.set_xticklabels(ticks, rotation=90)
-    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%")
+    ax.yaxis.set_major_formatter(format_perecent())
     ax.legend(
         [bar1, bar2],
         ["Failed runs (mutant not killed by any test)", "Failed runs (mutant killed by some test)"],
@@ -1902,14 +1928,12 @@ def write_stats():
         .agg(AGGS)
         .to_string()
     )
-    agg_stats.groupby("preset")[cols].agg(AGGS).transpose().to_csv(
-        OUTPUT_PATH / 'data.groupby("preset").agg().tsv', sep="\t"
-    )
+    agg_stats.groupby("preset")[cols].agg(AGGS).transpose().to_csv(OUTPUT_PATH / 'data.groupby("preset").agg().csv')
     agg_stats.groupby(["preset", "project"]).sum().groupby("preset")[cols].agg(AGGS).transpose().to_csv(
-        OUTPUT_PATH / 'data.groupby("preset", "project").sum().groupby("preset").agg().tsv', sep="\t"
+        OUTPUT_PATH / 'data.groupby("preset", "project").sum().groupby("preset").agg().csv'
     )
     agg_stats.groupby(["preset", "project"])[cols].agg(AGGS).transpose().to_csv(
-        OUTPUT_PATH / 'data.groupby("preset", "project").agg().tsv', sep="\t"
+        OUTPUT_PATH / 'data.groupby("preset", "project").agg().csv'
     )
 
 
@@ -1997,6 +2021,8 @@ def plot_mean_cost_2d():
     ax.set_xticks(range(10))
     ax.set_xticklabels(projects, rotation=90)
 
+    fig.legend(["Mean cost for each mutant"], loc="lower left")
+
     return fig
 
 
@@ -2056,7 +2082,7 @@ def plot_outcomes():
             ("Claimed Equivalent", lambda df: (df["outcome"] == EQUIVALENT).mean()),
             ("Failed", lambda df: (df["outcome"] == FAIL).mean()),
         ],
-        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.2f}%"),
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(format_perecent()),
     )
 
 
@@ -2088,7 +2114,7 @@ def plot_mean_line_coverage():
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         [("Line coverage", get_coverage_for_group)],
-        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.0f}%"),
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(format_perecent()),
     )
 
 
@@ -2112,11 +2138,14 @@ def plot_mean_branch_coverage():
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         [("Line coverage", get_coverage_for_group)],
-        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.0f}%"),
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(format_perecent()),
     )
 
 
 # %% Plot mean line coverage with best Pynguin run
+
+# TODO: combined pynguin coverage
+# TODO: avg Pynguin coverage
 
 
 @block
@@ -2144,7 +2173,9 @@ def plot_mean_line_coverage_with_pynguin():
     ax.bar(x=np.arange(5), height=values)
 
     ax.set_xticks(np.arange(5))
-    ax.set_xticklabels(PRESET_NAMES + ["Pynguin"], rotation=90)
+    ax.set_xticklabels(PRESET_NAMES + ["Pynguin (best run)"], rotation=90)
+    fig.legend(["Line Coverage"], loc="lower left")
+    ax.yaxis.set_major_formatter(format_perecent())
 
     return fig
 
@@ -2177,9 +2208,10 @@ def plot_mean_branch_coverage_with_pynguin():
     ax.bar(x=np.arange(5), height=values)
 
     ax.set_xticks(np.arange(5))
-    ax.set_xticklabels(PRESET_NAMES + ["Pynguin"], rotation=90)
+    ax.set_xticklabels(PRESET_NAMES + ["Pynguin (best run)"], rotation=90)
 
-    fig.legend(["Branch Coverage"], loc="lower right")
+    fig.legend(["Branch Coverage"], loc="lower left")
+    ax.yaxis.set_major_formatter(format_perecent())
     return fig
 
 
@@ -2201,7 +2233,7 @@ def plot_mean_mutation_scores():
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
         [("Mutation Score", lambda df: df["cosmic_ray_full.killed_by_own"].sum() / len(df))],
-        customization=lambda fig, ax: ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.0f}%"),
+        customization=lambda fig, ax: ax.yaxis.set_major_formatter(format_perecent()),
     )
 
 
@@ -2216,7 +2248,18 @@ def plot_mean_mutation_score_with_pynguin():
         group = data[data["preset"] == preset]
         values.append(group["cosmic_ray_full.killed_by_own"].sum())
 
-    values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_best"].sum())
+    def get_avg_kills_for_mutant(row):
+        num_runs = get_num_pynguin_runs_per_project(row["project"])
+        num_kills = row["pynguin.cosmic_ray.num_kills"]
+        if num_runs == 0:
+            if num_kills != 0:
+                raise Exception("shouldn't happen")
+            else:
+                return 0
+        return num_kills / num_runs
+
+    # values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_best"].sum())
+    values.append(data[data["preset"] == PRESETS[0]].apply(get_avg_kills_for_mutant, axis=1).sum())
     values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_any"].sum())
 
     values = np.array(values) / len(data[data["preset"] == PRESETS[0]])
@@ -2225,9 +2268,36 @@ def plot_mean_mutation_score_with_pynguin():
     ax.bar(x=np.arange(6), height=values)
 
     ax.set_xticks(np.arange(6))
+    ax.set_xticklabels(PRESET_NAMES + ["Pynguin (average)", "Pynguin (combined)"], rotation=90)
+
+    fig.legend(["Mutation Score"], loc="lower left")
+    ax.yaxis.set_major_formatter(format_perecent())
+    return fig
+
+
+# %% Plot number of killed mutants with best Pynguin run
+
+
+@block
+@savefig
+def plot_number_of_killed_mutants_with_pynguin():
+    values = []
+    for preset in PRESETS:
+        group = data[data["preset"] == preset]
+        values.append(group["cosmic_ray_full.killed_by_own"].sum())
+
+    values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_best"].sum())
+    values.append(data[data["preset"] == PRESETS[0]]["pynguin.cosmic_ray.killed_by_any"].sum())
+
+    values = np.array(values)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.bar(x=np.arange(6), height=values)
+
+    ax.set_xticks(np.arange(6))
     ax.set_xticklabels(PRESET_NAMES + ["Pynguin (best run)", "Pynguin (combined)"], rotation=90)
 
-    fig.legend(["Branch Coverage"], loc="lower right")
+    fig.legend(["Number of killed mutants"], loc="lower left")
     return fig
 
 
