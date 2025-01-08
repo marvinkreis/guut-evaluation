@@ -46,6 +46,7 @@
 # %% Imports and constants
 # ======================================================================================================================
 
+import ast
 import json
 import os
 import sqlite3
@@ -1290,6 +1291,58 @@ def add_sample_results_to_data():
     data["sampled"] = data["sample.equivalent"].map(lambda b: b is not None)
 
 
+# %% Count number of final test cases to data
+
+
+@block
+def add_number_of_final_test_cases():
+    def parse_number_of_test_cases(code: str | None):
+        if code is None:
+            return 0
+
+        module = ast.parse(code, "test.py", "exec")
+        top_level_func_defs = [
+            node.name for node in module.body if isinstance(node, ast.FunctionDef) if node.name.startswith("test")
+        ]
+        return len(top_level_func_defs)
+
+    data["num_final_test_cases"] = (
+        data["tests"].map(find_killing_test).map(lambda x: x["code"] if x else None).map(parse_number_of_test_cases)
+    )
+
+
+# %% Count Pynguin test cases
+
+PYNGUIN_TEST_DEF_REGEX = re.compile(r"^def test_case_\d+\(\)", re.MULTILINE)
+
+
+def count_pynguin_test_cases():
+    def parse_number_of_test_cases(code: str | None):
+        if code is None:
+            return 0
+        return len(re.findall(PYNGUIN_TEST_DEF_REGEX, code))
+
+    num_tests_per_exec = {}
+    for project in PROJECTS:
+        for index in range(1, 31):
+            exec_dir = PYNGUIN_TESTS_DIR / project / f"{index:02d}"
+            num_tests = 0
+
+            if exec_dir.is_dir():
+                for test_file in (exec_dir / "tests").iterdir():
+                    if not test_file.is_file():
+                        print(f"{test_file} is not a file")
+                    else:
+                        num_tests += parse_number_of_test_cases(test_file.read_text())
+
+            num_tests_per_exec[(project, index)] = num_tests
+
+    return num_tests_per_exec
+
+
+pynguin_num_tests_map = count_pynguin_test_cases()
+
+
 # %% Print memory usage
 
 
@@ -2139,7 +2192,7 @@ class ____Coverage:  # mark this in the outline
 
 # @block
 @savefig
-def plot_mean_line_coverage():
+def plot_line_coverage():
     def get_coverage_for_group(df):
         preset = df["preset"].unique()[0]
         projects = df["project"].unique()
@@ -2163,7 +2216,7 @@ def plot_mean_line_coverage():
 
 # @block
 @savefig
-def plot_mean_branch_coverage():
+def plot_branch_coverage():
     def get_coverage_for_group(df):
         preset = df["preset"].unique()[0]
         projects = df["project"].unique()
@@ -2184,13 +2237,10 @@ def plot_mean_branch_coverage():
 
 # %% Plot mean line coverage with Pynguin
 
-# TODO: combined pynguin coverage
-# TODO: avg Pynguin coverage
-
 
 @block
 @savefig
-def plot_mean_line_coverage_with_pynguin():
+def plot_line_coverage_with_pynguin():
     values = []
     for preset in PRESETS:
         num_covered = 0
@@ -2272,7 +2322,7 @@ def plot_mean_line_coverage_with_pynguin():
 
 @block
 @savefig
-def plot_mean_branch_coverage_with_pynguin():
+def plot_branch_coverage_with_pynguin():
     values = []
     for preset in PRESETS:
         num_covered = 0
@@ -2386,7 +2436,7 @@ def line_coverage_mannwhitneyu_test():
     values.append(num_avg_pynguin_covered)
 
     names = PRESETS + ["pynguin_combined", "pynguin_avg"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_line_coverage.csv")
+    mannwhitneyu_test(values, names, "mannwhitneyu_plot_line_coverage_with_pynugin.csv")
 
 
 # %% Mann Whitney U test with plot values from mean branch coverage plot
@@ -2426,7 +2476,7 @@ def branch_coverage_mannwhitneyu_test():
     values.append(num_avg_pynguin_covered)
 
     names = PRESETS + ["pynguin_combined", "pynguin_avg"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_branch_coverage.csv")
+    mannwhitneyu_test(values, names, "mannwhitneyu_plot_branch_coverage_with_pynugin.csv")
 
 
 # %% Mutation score
@@ -2442,7 +2492,7 @@ class ____Mutation_Score:  # mark this in the outline
 
 @block
 @savefig
-def plot_mean_mutation_scores():
+def plot_mutation_scores():
     return plot_bar_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
@@ -2456,7 +2506,7 @@ def plot_mean_mutation_scores():
 
 @block
 @savefig
-def plot_mean_mutation_score_with_pynguin():
+def plot_mutation_score_with_pynguin():
     values = []
     for preset in PRESETS:
         group = data[data["preset"] == preset]
@@ -2517,7 +2567,7 @@ def mutation_scores_mannwhitneyu_test():
     values.append(list(data[data["preset"] == PRESETS[0]].apply(get_avg_kills_for_mutant, axis=1)))
 
     names = PRESETS + ["pynguin_combined", "pynguin_avg"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_mutation_scores.csv")
+    mannwhitneyu_test(values, names, "mannwhitneyu_plot_mutation_score_with_pynugin.csv")
 
 
 # %% Mann Whitney U test with values from mean mutation scores plot, grouped by project
@@ -2556,7 +2606,7 @@ def mutation_scores_per_project_mannwhitneyu_test():
     values.append(avg_pynguin_kills_per_project)
 
     names = PRESETS + ["pynguin_combined", "pynguin_avg"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_mutation_scores_per_project.csv")
+    mannwhitneyu_test(values, names, "mannwhitneyu_plot_mutation_score_per_project_with_pynugin.csv")
 
 
 # %% Plot number of killed mutants with best Pynguin run
@@ -2600,6 +2650,82 @@ def killed_mutants_mannwhitneyu_test():
     values = [guut_groups[p] for p in PRESETS] + pynguin_groups
 
     mannwhitneyu_test(values, names, "mannwhitneyu_killed_mutants.csv")
+
+
+# %% Number of tests
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ____Number_Of_Tests:  # mark this in the outline
+    pass
+
+
+# %% Plot mean number of tests per mutant with Pynguin
+
+
+@block
+@savefig
+def plot_number_of_test_cases():
+    values = []
+    for preset in PRESETS:
+        group = data[data["preset"] == preset]
+        values.append(group["num_final_test_cases"].sum())
+
+    # Pynguin avg runs
+    num_avg_pynguin_tests = 0
+    for project in PROJECTS:
+        num_tests_per_project = 0
+
+        for index in range(1, 31):
+            num_tests = pynguin_num_tests_map.get((project, index), 0)
+            num_tests_per_project += num_tests
+
+        num_avg_pynguin_tests += num_tests_per_project / get_num_pynguin_runs_per_project(project)
+    values.append(num_avg_pynguin_tests)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.bar(x=np.arange(len(values)), height=values)
+
+    ax.set_xticks(np.arange(len(values)))
+
+    labels = PRESET_NAMES + ["Pynguin (average)"]
+    ax.set_xticklabels(labels, rotation=90)
+
+    fig.legend(["Number of test cases"], loc="lower left")
+
+    return fig, list(zip(labels, [int(val) for val in values]))
+
+
+# %% Mann Whitney U test with the number of tests
+
+
+@block
+@savefig
+def mannwhitneyu_number_of_test_cases():
+    values = []
+    for preset in PRESETS:
+        num_tests_per_project = []
+
+        for project in PROJECTS:
+            group = data[(data["preset"] == preset) & (data["project"] == project)]
+            num_tests_per_project.append(group["num_final_test_cases"].sum())
+
+        values.append(num_tests_per_project)
+
+    # Pynguin avg runs
+    num_avg_pynguin_tests = []
+    for project in PROJECTS:
+        num_tests_per_project = 0
+
+        for index in range(1, 31):
+            num_tests = pynguin_num_tests_map.get((project, index), 0)
+            num_tests_per_project += num_tests
+
+        num_avg_pynguin_tests.append(num_tests_per_project / get_num_pynguin_runs_per_project(project))
+    values.append(num_avg_pynguin_tests)
+
+    labels = PRESET_NAMES + ["Pynguin (average)"]
+    mannwhitneyu_test(values, labels, "mannwhitneyu_plot_number_of_test_cases.csv")
 
 
 # %% Paper RQ 2: Can our approach reliably detect equivalent mutants
@@ -2781,3 +2907,6 @@ def plot_num_completions_before_equivalence_claim_per_outcome():
 # %% sandbox 2
 # %% sandbox 3
 # %% sandbox 4
+
+
+data[data["mutant_killed"]]["num_final_test_cases"].agg(["min", "max", "mean"])
