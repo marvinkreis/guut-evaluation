@@ -61,6 +61,7 @@ from scipy.stats import mannwhitneyu
 import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib import colormaps as cm
 from matplotlib.figure import Figure
 from tqdm import tqdm
@@ -180,26 +181,38 @@ def savefig(function):
 
         if isinstance(retval, Figure):
             fig = retval
-            fig.savefig(OUTPUT_PATH / f"{function.__name__}.png")
-            fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf")
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.png", bbox_inches="tight")
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf", bbox_inches="tight")
         elif isinstance(retval, Tuple):
             fig, obj = retval
-            fig.savefig(OUTPUT_PATH / f"{function.__name__}.png")
-            fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf")
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.png", bbox_inches="tight")
+            fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf", bbox_inches="tight")
             (OUTPUT_PATH / f"{function.__name__}.json").write_text(json.dumps(obj))
 
-        if isinstance(retval, list):
-            for index, entry in enumerate(retval):
-                fig = entry
-                if isinstance(entry, Figure):
-                    fig = entry
-                    fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
-                    fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
-                elif isinstance(entry, Tuple):
-                    fig, obj = entry
-                    fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
-                    fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
-                    (OUTPUT_PATH / f"{function.__name__}.json").write_text(json.dumps(obj))
+        # elif isinstance(retval, Dict):
+        #     fig = retval["fig"]
+        #     if "bbox_extra" in retval:
+        #         fig.savefig(OUTPUT_PATH / f"{function.__name__}.png", bbox_extra_artists=retval["bbox_extra"])
+        #         fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf", bbox_extra_artists=retval["bbox_extra"])
+        #     else:
+        #         fig.savefig(OUTPUT_PATH / f"{function.__name__}.png")
+        #         fig.savefig(OUTPUT_PATH / f"{function.__name__}.pdf")
+
+        #     if "data" in retval:
+        #         (OUTPUT_PATH / f"{function.__name__}.json").write_text(json.dumps(retval["data"]))
+
+        # if isinstance(retval, list):
+        #     for index, entry in enumerate(retval):
+        #         fig = entry
+        #         if isinstance(entry, Figure):
+        #             fig = entry
+        #             fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
+        #             fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
+        #         elif isinstance(entry, Tuple):
+        #             fig, obj = entry
+        #             fig.savefig(OUTPUT_PATH / f"{function.__name__}_{index+1:02}.png")
+        #             fig.savefig(OUTPUT_PATH / f"{function.__name__}.{index+1:02}.pdf")
+        #             (OUTPUT_PATH / f"{function.__name__}.json").write_text(json.dumps(obj))
 
     return outer_function
 
@@ -1747,7 +1760,11 @@ def plot_bar_per_group(
 
     ax.set_xticks(np.arange(len(groups)))
     ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
-    fig.legend([c[0] for c in cols], loc="lower left")
+
+    if len(cols) == 1:
+        ax.set_ylabel(cols[0][0])
+    else:
+        fig.legend([c[0] for c in cols], loc="lower left")
 
     if customization:
         customization(fig, ax)
@@ -1786,12 +1803,46 @@ def plot_violin_per_group(
 ):
     values = [query_group(grouped_data, group_key, col_fun, [0]) for group_key, group_name in groups]
 
-    fig, ax = plt.subplots(layout="constrained", figsize=(6, 6))
-    ax.violinplot(values, showmeans=True, widths=np.repeat(1, len(groups)))
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    violin_parts = ax.violinplot(values, showmeans=True, widths=np.repeat(1, len(groups)))
+    ax.margins(x=0.01)
+
+    for partname in ("cbars", "cmins", "cmaxes", "cmeans"):
+        vp = violin_parts[partname]
+        vp.set_edgecolor("black")
+        vp.set_linewidth(1)
+
+    for vp in violin_parts["bodies"]:
+        vp.set_facecolor("red")
+        vp.set_edgecolor("red")
+        vp.set_linewidth(1)
+        vp.set_alpha(0.4)
 
     ax.set_xticks(np.arange(len(groups)) + 1)
     ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
-    fig.legend([col_name], loc="lower left")
+    ax.set_ylabel(col_name)
+
+    if customization:
+        customization(fig, ax)
+
+    return fig
+
+
+def plot_dist_per_group(
+    grouped_data: Any,
+    groups: List[Tuple[str, str]],
+    col_name: str,
+    col_fun: Callable[[Any], Any],
+    customization: Callable[[Any, Any], None] | None = None,
+):
+    values = [list(query_group(grouped_data, group_key, col_fun, [0])) for group_key, group_name in groups]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(6, 6))
+    distribution_plot(values, ax=ax)
+
+    ax.set_xticks(np.arange(len(groups)))
+    ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
+    ax.set_ylabel(col_name)
 
     if customization:
         customization(fig, ax)
@@ -1816,6 +1867,88 @@ def mannwhitneyu_test(values, names, filename):
 
     df = pd.DataFrame(results)
     df.to_csv(OUTPUT_PATH / filename)
+
+
+def distribution_plot(
+    data: pd.DataFrame | pd.Series | Dict[str, Any] | Any,
+    *,
+    x: Any | None = None,
+    y: Any | None = None,
+    hue: Any | None = None,
+    order: (Any | None) = None,
+    hue_order: (Any | None) = None,
+    orient: Literal["v", "h", "x", "y"] | None = None,
+    color: (Any | None) = None,
+    palette: Any | None = None,
+    width: float = 0.8,
+    gap: float = 0.0,
+    formatter: Callable[[Any], str] | None = None,
+    ax: Any | None = None,
+    **kwargs,
+) -> None:
+    """Draw a distribution plot, built of a boxplot and a stripplot.
+    See the respective documentation for Seaborn's boxplot and stripplot for the various
+    parameters and how the plots are created.
+    Args:
+        data: Dataset for plotting.  If ``x`` and ``y`` are absent, this is interpreted
+              as wide-form.  Otherwise it is expected to be long-form.
+        x: Name of a variable in ``data`` to be plotted on the x-axis.
+        y: Name of a variable in ``data`` to be plotted on the y-axis.
+        hue: Name of a variable in ``data`` that determines the hue of the colours.
+        order: Order to plot the categorical levels in; otherwise the levels are
+               inferred from the data objects.
+        hue_order: Order to plot the categorical levels in; otherwise the levels are
+                   inferred from the data objects.
+        orient: Orientation of the plot (vertical or horizontal).  This is usually
+                inferred based on the type of the input variables, but it can be used to
+                resolve ambiguity when both ``x`` and ``y`` are numeric or when plotting
+                wide-form data.
+        color: Single colour for the elements in the plot.
+        palette: Colours to use for the different levels of the ``hue`` variable.
+                 Should be something that can be interpreted by ``color_palette()``, or
+                 a dictionary mapping hue levels to matplotlib colours.
+        width: Width allotted to each element on the orient axis.
+        gap: Shrink on the orient axis by this factor to add a gap between dodged
+             elements.
+        formatter: Function for converting categorical data into strings.  Affects both
+                   grouping and tick labels.
+        ax: Axes object to draw the plot onto, otherwise use the current Axes.
+        **kwargs: Other keyword arguments are passed through to the plot functions.
+    """
+    sns.boxplot(
+        data,
+        x=x,
+        y=y,
+        ax=ax,
+        boxprops={"alpha": 0.4},
+        color=color,
+        fliersize=0.0,
+        formatter=formatter,
+        gap=gap,
+        hue=hue,
+        hue_order=hue_order,
+        order=order,
+        orient=orient,
+        palette=palette,
+        width=width,
+        **kwargs,
+    )
+    sns.stripplot(
+        data,
+        x=x,
+        y=y,
+        ax=ax,
+        color=color,
+        dodge=False,
+        formatter=formatter,
+        hue=hue,
+        hue_order=hue_order,
+        order=order,
+        orient=orient,
+        palette=palette,
+        size=2,
+        **kwargs,
+    )
 
 
 # %% Shelved Plots and Data
@@ -1883,8 +2016,8 @@ def plot_percentage_of_direct_kills():
 @savefig
 def plot_percentage_of_equivalence_claims():
     ticks = []
-    percentages_killed = []
-    percentages_unkilled = []
+    num_killed = []
+    num_unkilled = []
 
     for preset in PRESETS:
         if preset == "baseline_without_iterations":
@@ -1899,24 +2032,29 @@ def plot_percentage_of_equivalence_claims():
                 (target_data["outcome"] == EQUIVALENT) & target_data["cosmic_ray_full.killed_by_any"]
             ]
             ticks.append(f"{project} {preset}")
-            percentages_killed.append(len(claims_killed) / len(target_data))
-            percentages_unkilled.append(len(claims_unkilled) / len(target_data))
+            # percentages_killed.append(len(claims_killed) / len(target_data))
+            # percentages_unkilled.append(len(claims_unkilled) / len(target_data))
+            num_killed.append(len(claims_killed))
+            num_unkilled.append(len(claims_unkilled))
 
     fig, ax = plt.subplots(layout="constrained", figsize=(8, 8))
     x = np.arange(len(ticks))
-    bar1 = ax.bar(x, percentages_unkilled, color=cmap_colors[0])
+    bar1 = ax.bar(x, num_unkilled, color=cmap_colors[0])
     bar2 = ax.bar(
         x,
-        percentages_killed,
+        num_killed,
         color=cmap_colors[1],
-        bottom=percentages_unkilled,
+        bottom=num_unkilled,
     )
     ax.set_xticks(x)
     ax.set_xticklabels(ticks, rotation=90)
-    ax.yaxis.set_major_formatter(format_perecent())
+    # ax.yaxis.set_major_formatter(format_perecent())
     ax.legend(
         [bar1, bar2],
-        ["Mutants claimed equivalent (not killed by any test)", "Mutants claimed equivalent (killed by some test)"],
+        [
+            "Mutants claimed equivalent (not killable with any generated test)",
+            "Mutants claimed equivalent (killed by a generated test)",
+        ],
     )
     return fig
 
@@ -2193,6 +2331,7 @@ def plot_sum_cost_per_project():
     ax.set_xticks(x + 1.5)
     ax.set_xticklabels(PROJECTS, rotation=90)
     fig.legend(PRESET_NAMES, loc=(0.1, 0.8))
+    ax.set_ylabel("Cost for each project")
 
     return fig, list(zip(PRESETS, [list(zip(PROJECTS, c)) for c in costs]))
 
@@ -2222,6 +2361,7 @@ def plot_mean_cost_per_project():
     ax.set_xticks(x + 1.5)
     ax.set_xticklabels(PROJECTS, rotation=90)
     fig.legend(PRESET_NAMES, loc=(0.1, 0.8))
+    ax.set_ylabel("Mean cost per mutant")
 
     return fig, list(zip(PRESETS, [list(zip(PROJECTS, c)) for c in mean_costs]))
 
@@ -2246,6 +2386,7 @@ def plot_num_tokens_per_mutant():
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
     fig.legend(labels, loc="upper left")
+    ax.set_ylabel("Mean token usage per mutant")
 
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
@@ -2269,11 +2410,13 @@ def plot_cost_per_mutant():
     ax.yaxis.set_major_formatter(lambda x, pos: f"{x*100:.1f}¢")
     ax.set_xticks(np.arange(4))
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
+    ax.set_ylabel("Mean cost per mutant")
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
     fig.legend(
         labels,
         loc="upper left",
     )
+
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
 
@@ -2339,6 +2482,7 @@ def plot_outcomes():
         labels,
         loc="upper left",
     )
+    ax.set_ylabel("Percentage of outcomes")
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
 
@@ -2500,13 +2644,14 @@ def plot_line_coverage_with_pynguin():
         labels,
         rotation=90,
     )
-    fig.legend(["Line Coverage"], loc="lower left")
+    # fig.legend(["Line Coverage"], loc="lower left")
+    ax.set_ylabel("Line Covereage")
     ax.yaxis.set_major_formatter(format_perecent())
 
     return fig, list(zip(labels, values))
 
 
-# %% Plot mean branch coverage with Pynguin
+# %% Plot branch coverage with Pynguin
 
 
 @block
@@ -2583,8 +2728,118 @@ def plot_branch_coverage_with_pynguin():
         rotation=90,
     )
 
-    fig.legend(["Branch Coverage"], loc="lower left")
+    ax.set_ylabel("Branch Covereage")
     ax.yaxis.set_major_formatter(format_perecent())
+    return fig, list(zip(labels, values))
+
+
+# %% Plot mean line coverage with Pynguin
+
+
+@block
+@savefig
+def plot_line_coverage_with_pynguin_distplot():
+    values = []
+    for preset in PRESETS:
+        num_covered = []
+        for project in PROJECTS:
+            num_covered.append(len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project]))
+        values.append(num_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = []
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        covered_lines_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_lines_per_project.update(coverage.executed_lines)
+
+        num_combined_pynguin_covered.append(len(covered_lines_per_project) / len(all_seen_lines_map[project]))
+    values.append(num_combined_pynguin_covered)
+
+    # All Pynguin runs
+    num_avg_pynguin_covered = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_avg_pynguin_covered.append(len(coverage.executed_lines) / len(all_seen_lines_map[project]))
+    values.append(num_avg_pynguin_covered)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (all)"]
+    distribution_plot(values, ax=ax)
+
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(
+        labels,
+        rotation=90,
+    )
+
+    ax.yaxis.set_major_formatter(format_perecent())
+    ax.set_ylabel("Line Coverage")
+    return fig, list(zip(labels, values))
+
+
+# %% Plot mean branch coverage with Pynguin
+
+
+@block
+@savefig
+def plot_branch_coverage_with_pynguin_distplot():
+    values = []
+    for preset in PRESETS:
+        num_covered = []
+        for project in PROJECTS:
+            num_covered.append(
+                len(coverage_map[(preset, project)].executed_branches) / len(all_seen_branches_map[project])
+            )
+        values.append(num_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = []
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        covered_branches_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_branches_per_project.update(coverage.executed_branches)
+
+        num_combined_pynguin_covered.append(len(covered_branches_per_project) / len(all_seen_branches_map[project]))
+    values.append(num_combined_pynguin_covered)
+
+    # All Pynguin runs
+    num_avg_pynguin_covered = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_avg_pynguin_covered.append(len(coverage.executed_branches) / len(all_seen_branches_map[project]))
+    values.append(num_avg_pynguin_covered)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (all)"]
+    distribution_plot(values, ax=ax)
+
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(
+        labels,
+        rotation=90,
+    )
+
+    ax.yaxis.set_major_formatter(format_perecent())
+    ax.set_ylabel("Branch Coverage")
     return fig, list(zip(labels, values))
 
 
@@ -2690,7 +2945,7 @@ def plot_mutation_scores():
     )
 
 
-# %% Plot mean mutation scores with Pynguin
+# %% Plot mutation scores with Pynguin
 
 
 @block
@@ -2726,9 +2981,65 @@ def plot_mutation_score_with_pynguin():
     labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (average)"]
     ax.set_xticklabels(labels, rotation=90)
 
-    fig.legend(["Mutation Score"], loc="lower left")
+    # fig.legend(["Mutation Score"], loc="lower left")
     ax.yaxis.set_major_formatter(format_perecent())
+    ax.set_ylabel("Mutation Score")
 
+    return fig, list(zip(labels, values))
+
+
+# %% Plot mutation score coverage with Pynguin
+
+
+@block
+@savefig
+def plot_mutation_score_with_pynguin_distplot():
+    grouped_data = data.groupby(["preset", "project"])
+    grouped_pynguin_data = pynguin_data.groupby(["project", "index"])
+
+    values = []
+    for preset in PRESETS:
+        killed_mutants = []
+        for project in PROJECTS:
+            group = grouped_data.get_group((preset, project))
+            killed_mutants.append(group["cosmic_ray.killed_by_own"].sum() / len(group))
+        values.append(killed_mutants)
+
+    # Pynguin combined runs
+    num_combined_pynguin = []
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        group = grouped_data.get_group((PRESETS[0], project))
+        num_combined_pynguin.append(group["pynguin.cosmic_ray.killed_by_any"].sum() / len(group))
+    values.append(num_combined_pynguin)
+
+    # All Pynguin runs
+    num_all_pynguin = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            if group["killed"].sum() == 0:
+                print(project, index)
+            num_all_pynguin.append(group["killed"].sum() / len(group))
+    values.append(num_all_pynguin)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (all)"]
+    distribution_plot(values, ax=ax)
+
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(
+        labels,
+        rotation=90,
+    )
+
+    ax.yaxis.set_major_formatter(format_perecent())
+    ax.set_ylabel("Mutation Score")
     return fig, list(zip(labels, values))
 
 
@@ -2876,13 +3187,51 @@ def plot_number_of_test_cases():
     ax.bar(x=np.arange(len(values)), height=values)
 
     ax.set_xticks(np.arange(len(values)))
-
     labels = PRESET_NAMES + ["Pynguin (average)"]
     ax.set_xticklabels(labels, rotation=90)
 
-    fig.legend(["Number of test cases"], loc="lower left")
+    ax.set_ylabel("Number of test cases")
 
     return fig, list(zip(labels, [int(val) for val in values]))
+
+
+# %% Plot mean number of tests per mutant with Pynguin
+
+
+@block
+@savefig
+def plot_number_of_test_cases_distplot():
+    grouped_data = data.groupby(["preset", "project"])
+
+    values = []
+    for preset in PRESETS:
+        num_tests_per_project = []
+
+        for project in PROJECTS:
+            group = grouped_data.get_group((preset, project))
+            num_tests_per_project.append(group["num_final_test_cases"].sum())
+
+        values.append([int(n) for n in num_tests_per_project])
+
+    # Pynguin runs
+    num_all_pynguin_tests = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            num_tests = pynguin_num_tests_map.get((project, index), 0)
+            num_all_pynguin_tests.append(num_tests)
+    values.append(num_all_pynguin_tests)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    labels = PRESET_NAMES + ["Pynguin"]
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(labels, rotation=90)
+    ax.set_ylabel("Number of tests")
+    distribution_plot(values, ax=ax)
+
+    return fig, list(zip(labels, values))
 
 
 # %% Mann Whitney U test with the number of tests
@@ -2943,6 +3292,21 @@ def plot_num_turns():
     return plot_violin_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
+        "Number of iterations",
+        lambda df: df["num_turns"],
+    ), plot_data.transpose().to_dict()
+
+
+# %% Number of turns distribution plot
+
+
+@block
+@savefig
+def plot_num_turns_distplot():
+    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
+    return plot_dist_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
         "Number of turns",
         lambda df: df["num_turns"],
     ), plot_data.transpose().to_dict()
@@ -2957,21 +3321,6 @@ def mannwhitneyu_plot_num_turns():
     mannwhitneyu_test(
         [plot_data.get_group(preset) for preset in PRESETS], PRESET_NAMES, "mannwhitneyu_plot_num_turns.csv"
     )
-
-
-# %% Number of turns
-
-
-@block
-@savefig
-def plot_num_turns():
-    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
-    return plot_violin_per_group(
-        data.groupby("preset"),
-        list(zip(PRESETS, PRESET_NAMES)),
-        "Number of turns",
-        lambda df: df["num_turns"],
-    ), plot_data.transpose().to_dict()
 
 
 # %% Number of turns (excluding turns after an equivalence claim is made)
@@ -3142,9 +3491,56 @@ class ____RQ_3:  # mark this in the outline
 
 # %% Write stats about sampled mutants.
 
-data[(data["preset"] == PRESETS[0]) & data["sampled"]][["sample.equivalent", "sample.unsure"]].map(int).agg(
-    ["sum", "mean", "count"]
-).to_csv(OUTPUT_PATH / "sampled_mutants_results.csv")
+data[(data["preset"] == PRESETS[0]) & data["sampled"]][
+    ["sample.equivalent", "sample.unsure", "mutant.num_equivalence_claims"]
+].map(int).agg(["sum", "mean", "count"]).to_csv(OUTPUT_PATH / "sampled_mutants_results.csv")
+
+data[(data["preset"] == PRESETS[0]) & data["sampled"]][
+    ["sample.equivalent", "sample.unsure", "mutant.num_equivalence_claims"]
+].map(int).groupby("mutant.num_equivalence_claims").agg(["sum", "mean", "count"]).to_csv(
+    OUTPUT_PATH / "sampled_mutants_results_per_num_claims.csv"
+)
+
+
+# %% Plot number of killed and unkilled equivalent mutants
+
+
+@block
+@savefig
+def plot_number_of_killed_and_unkilled_equivalences():
+    num_killed = []
+    num_unkilled = []
+
+    plot_data = data.groupby("preset")
+    for preset in PRESETS:
+        if preset == "baseline_without_iterations":
+            continue
+
+        group = plot_data.get_group(preset)
+        claims_unkilled = group[(group["outcome"] == EQUIVALENT) & ~group["cosmic_ray_full.killed_by_any"]]
+        claims_killed = group[(group["outcome"] == EQUIVALENT) & group["cosmic_ray_full.killed_by_any"]]
+        num_killed.append(len(claims_killed))
+        num_unkilled.append(len(claims_unkilled))
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(3, 6))
+    x = np.arange(3)
+    bar1 = ax.bar(x, num_unkilled, color=cmap_colors[0])
+    bar2 = ax.bar(
+        x,
+        num_killed,
+        color=cmap_colors[1],
+        bottom=num_unkilled,
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(PRESET_NAMES[1:], rotation=90)
+    fig.legend(
+        [
+            "alive",
+            "killed",
+        ],
+        loc="lower left",
+    )
+    return fig
 
 
 # %% sandbox 2
@@ -3153,3 +3549,7 @@ data[(data["preset"] == PRESETS[0]) & data["sampled"]][["sample.equivalent", "sa
 
 
 data[data["mutant_killed"]]["num_final_test_cases"].agg(["min", "max", "mean"])
+
+# %% sandbox 4
+
+seaborn
