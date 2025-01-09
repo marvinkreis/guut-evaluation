@@ -1,0 +1,27 @@
+diff --git a/apimd/apimd/compiler.py b/apimd_mutant/apimd/compiler.py
+index 1753eeb..414b757 100644
+--- a/apimd/apimd/compiler.py
++++ b/apimd_mutant/apimd/compiler.py
+@@ -259,21 +259,21 @@ def interpret_mode(doc: str) -> Iterable[str]:
+         signed = line.startswith(">>> ")
+         if signed:
+             line = line[len(">>> "):]
+             if not keep:
+                 yield "```python"
+                 keep = True
+         elif keep:
+             yield "```\n"
+             keep = False
+         yield line
+-        if signed and i == len(lines) - 1:
++        if signed and i is len(lines) - 1:
+             yield "```\n"
+             keep = False
+ 
+ 
+ def get_type_doc(obj: type) -> str:
+     """Get the doc string for a type."""
+     doc = f"\n\nInherited from `{get_name(super_cls(obj))}`."
+     ts = parameters(obj)
+     if ts:
+         doc += f" Parameters: {', '.join(f'`{t}`' for t in ts)}"

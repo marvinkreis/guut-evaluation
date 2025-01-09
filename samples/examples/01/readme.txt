@@ -1,0 +1,1 @@
+The mutant turns an "==" comparison between numbers into an "is" comparison, which does the same for Pythons builtin numbers. Both operands are controlled by builtin functions: the left side is controlled "enumerate" and the right side is controlled by "len".

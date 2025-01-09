@@ -1,0 +1,23 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /tmp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        orig_enumerate = __builtins__["enumerate"]
+        __builtins__["enumerate"] = lambda x: [(EqToAll(), y) for y in x] if x == [">>> "] else orig_enumerate(x)
+>       assert "```\n" in list(interpret_mode(">>> "))
+E       AssertionError: assert '```\n' in ['```python', '']
+E        +  where ['```python', ''] = list(<generator object interpret_mode at 0x7368b8103580>)
+E        +    where <generator object interpret_mode at 0x7368b8103580> = interpret_mode('>>> ')
+
+../test.py:11: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert '```\n' in ['```python', '']
+============================== 1 failed in 0.03s ===============================

@@ -1,0 +1,29 @@
+Running test on mutant:
+============================= test session starts ==============================
+platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
+rootdir: /mnt/temp/inspect_mutant
+collected 1 item
+
+../test.py F
+
+=================================== FAILURES ===================================
+_____________________________________ test _____________________________________
+
+    def test():
+        with patch("re.finditer", side_effect=[
+            [
+                SimpleNamespace(group=lambda n: ":name1: desc1"),
+                SimpleNamespace(group=lambda n: None),
+                SimpleNamespace(group=lambda n: ":name2: desc2"),
+            ]
+        ]):
+>           assert len(parse(":name: val").meta) == 2
+E           AssertionError: assert 1 == 2
+E            +  where 1 = len([<docstring_parser.common.DocstringMeta object at 0x7ea9508a4e50>])
+E            +    where [<docstring_parser.common.DocstringMeta object at 0x7ea9508a4e50>] = <docstring_parser.common.Docstring object at 0x7ea9508a4f40>.meta
+E            +      where <docstring_parser.common.Docstring object at 0x7ea9508a4f40> = parse(':name: val')
+
+../test.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED ../test.py::test - AssertionError: assert 1 == 2
+============================== 1 failed in 0.04s ===============================

@@ -1,0 +1,27 @@
+diff --git a/dataclasses-json/dataclasses_json/undefined.py b/dataclasses-json_mutant/dataclasses_json/undefined.py
+index 96ac284..e1ffa6c 100644
+--- a/dataclasses-json/dataclasses_json/undefined.py
++++ b/dataclasses-json_mutant/dataclasses_json/undefined.py
+@@ -138,21 +138,21 @@ class _CatchAllUndefinedParameters(_UndefinedParameterAction):
+             cls=cls)
+ 
+         if catch_all_field.name in known:
+ 
+             already_parsed = isinstance(known[catch_all_field.name], dict)
+             default_value = _CatchAllUndefinedParameters._get_default(
+                 catch_all_field=catch_all_field)
+             received_default = default_value == known[catch_all_field.name]
+ 
+             value_to_write: Any
+-            if received_default and len(unknown) == 0:
++            if received_default and len(unknown) <= 0:
+                 value_to_write = default_value
+             elif received_default and len(unknown) > 0:
+                 value_to_write = unknown
+             elif already_parsed:
+                 # Did not receive default
+                 value_to_write = known[catch_all_field.name]
+                 if len(unknown) > 0:
+                     value_to_write.update(unknown)
+             else:
+                 error_message = f"Received input field with " \

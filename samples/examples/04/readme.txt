@@ -1,0 +1,1 @@
+Mutant changes the max number of splits in a "str.split" method call, but only the first part is used. We can pass use a "UserString" subclass that mocks the "split" method and detects the mutant. However, the string comes from an "inspect.getdoc" call, so we have to mock the call to return our string.

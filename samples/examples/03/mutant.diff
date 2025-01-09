@@ -1,0 +1,27 @@
+diff --git a/docstring_parser/docstring_parser/rest.py b/docstring_parser_mutant/docstring_parser/rest.py
+index 09ccf5f..bc59fbd 100644
+--- a/docstring_parser/docstring_parser/rest.py
++++ b/docstring_parser_mutant/docstring_parser/rest.py
+@@ -107,21 +107,21 @@ def parse(text: str) -> Docstring:
+         long_desc_chunk = parts[1] or ""
+         ret.blank_after_short_description = long_desc_chunk.startswith("\n")
+         ret.blank_after_long_description = long_desc_chunk.endswith("\n\n")
+         ret.long_description = long_desc_chunk.strip() or None
+ 
+     for match in re.finditer(
+         r"(^:.*?)(?=^:|\Z)", meta_chunk, flags=re.S | re.M
+     ):
+         chunk = match.group(0)
+         if not chunk:
+-            continue
++            break
+         try:
+             args_chunk, desc_chunk = chunk.lstrip(":").split(":", 1)
+         except ValueError:
+             raise ParseError(
+                 'Error parsing meta information near "{}".'.format(chunk)
+             )
+         args = args_chunk.split()
+         desc = desc_chunk.strip()
+         if "\n" in desc:
+             first_line, rest = desc.split("\n", 1)
