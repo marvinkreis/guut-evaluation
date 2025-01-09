@@ -1,7 +1,7 @@
 Running test on baseline:
 ============================= test session starts ==============================
 platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
-rootdir: /mnt/temp/inspect_mutant
+rootdir: /tmp/inspect_mutant
 collected 1 item
 
 ../test.py .

@@ -1,7 +1,7 @@
 Running test on mutant:
 ============================= test session starts ==============================
 platform linux -- Python 3.8.19, pytest-8.3.3, pluggy-1.5.0
-rootdir: /mnt/temp/inspect_mutant
+rootdir: /tmp/inspect_mutant
 collected 1 item
 
 ../test.py F
@@ -14,8 +14,8 @@ _____________________________________ test _____________________________________
         __builtins__["enumerate"] = lambda x: [(EqToAll(), y) for y in x] if x == [">>> "] else orig_enumerate(x)
 >       assert "```\n" in list(interpret_mode(">>> "))
 E       AssertionError: assert '```\n' in ['```python', '']
-E        +  where ['```python', ''] = list(<generator object interpret_mode at 0x7a14153787b0>)
-E        +    where <generator object interpret_mode at 0x7a14153787b0> = interpret_mode('>>> ')
+E        +  where ['```python', ''] = list(<generator object interpret_mode at 0x7368b8103580>)
+E        +    where <generator object interpret_mode at 0x7368b8103580> = interpret_mode('>>> ')
 
 ../test.py:11: AssertionError
 =========================== short test summary info ============================
