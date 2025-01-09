@@ -1747,7 +1747,7 @@ def plot_bar_per_group(
 
     ax.set_xticks(np.arange(len(groups)))
     ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
-    fig.legend([c[0] for c in cols], loc="lower right")
+    fig.legend([c[0] for c in cols], loc="lower left")
 
     if customization:
         customization(fig, ax)
@@ -1791,7 +1791,7 @@ def plot_violin_per_group(
 
     ax.set_xticks(np.arange(len(groups)) + 1)
     ax.set_xticklabels([group_name for group_key, group_name in groups], rotation=90)
-    fig.legend([col_name], loc="lower right")
+    fig.legend([col_name], loc="lower left")
 
     if customization:
         customization(fig, ax)
@@ -1807,8 +1807,6 @@ def mannwhitneyu_test(values, names, filename):
         results[f"{name}_pvalue"] = []
 
     for group_name_2, values_2 in zip(names, values):
-        if isinstance(group_name_2, int):
-            group_name_2 = f"pynguin_{group_name_2}"
         results["comparison"].append(group_name_2)
 
         for group_name_1, values_1 in zip(names, values):
@@ -2080,9 +2078,6 @@ data[usage_cols].sum()
 # %% Plot mean cost per preset and project
 
 
-save_figs = True
-
-
 @block
 @savefig
 def plot_mean_cost_2d():
@@ -2119,21 +2114,140 @@ def plot_mean_cost_2d():
     return fig
 
 
-# %% Plot mean number of tokens for one mutant
+# %% Plot mean cost per preset and project as bars
+
+
+# @block
+# @savefig
+def plot_mean_cost_per_project_():
+    projects = sorted(list(data["project"].unique()))
+    plot_data = data.groupby(["preset", "project"])
+
+    mean_costs = [
+        [plot_data.get_group((preset, project))["usage.cost"].mean() for project in PROJECTS] for preset in PRESETS
+    ]
+
+    fig, axs = plt.subplots(4, 1, layout="constrained", figsize=(8, 6), sharex="all", sharey="all", squeeze=True)
+
+    for i in range(4):
+        axs[i].bar(x=np.arange(10), height=mean_costs[i])
+        axs[i].set_xlim((-0.5, 9.5))
+        axs[i].set_xticks(range(10))
+        axs[i].yaxis.set_major_formatter(lambda x, pos: f"{x*100:.1f}¢")
+        axs[3].set_yticks([0.00, 0.002, 0.004, 0.006, 0.008, 0.010])
+    axs[3].set_xticklabels(projects, rotation=90)
+
+    fig.legend(["Mean cost for each mutant"], loc=(0.5, 0.03))
+
+    return fig
+
+
+# %% Plot cost per preset and project as bars
+
+
+# @block
+# @savefig
+def plot_sum_cost_per_project_():
+    projects = sorted(list(data["project"].unique()))
+    plot_data = data.groupby(["preset", "project"])
+
+    mean_costs = [
+        [plot_data.get_group((preset, project))["usage.cost"].sum() for project in PROJECTS] for preset in PRESETS
+    ]
+
+    fig, axs = plt.subplots(4, 1, layout="constrained", figsize=(8, 6), sharex="all", sharey="all", squeeze=True)
+
+    for i in range(4):
+        axs[i].bar(x=np.arange(10), height=mean_costs[i])
+        axs[i].set_xlim((-0.5, 9.5))
+        axs[i].set_xticks(range(10))
+        axs[i].yaxis.set_major_formatter(lambda x, pos: f"{x:.0f}$")
+    axs[3].set_yticks([0, 2, 4, 6, 8, 10])
+    axs[3].set_xticklabels(projects, rotation=90)
+
+    fig.legend(["Mean cost for each mutant"], loc=(0.5, 0.05))
+
+    return fig
+
+
+# %% Plot total cost per preset and project as bars
+
+
+@block
+@savefig
+def plot_sum_cost_per_project():
+    plot_data = data.groupby(["preset", "project"])
+    costs = [[plot_data.get_group((preset, project))["usage.cost"].sum() for project in PROJECTS] for preset in PRESETS]
+
+    x = np.arange(len(PROJECTS)) * 5
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 6))
+
+    ax.bar(x=x, height=costs[0], color=cmap_colors[0], width=1)
+    ax.bar(x=x + 1, height=costs[1], color=cmap_colors[1], width=1)
+    ax.bar(x=x + 2, height=costs[2], color=cmap_colors[2], width=1)
+    ax.bar(x=x + 3, height=costs[3], color=cmap_colors[3], width=1)
+    ax.set_xlim((-2, 50))
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x:.0f}$")
+
+    ax.set_xticks(x + 1.5)
+    ax.set_xticklabels(PROJECTS, rotation=90)
+    fig.legend(PRESET_NAMES, loc=(0.1, 0.8))
+
+    return fig, list(zip(PRESETS, [list(zip(PROJECTS, c)) for c in costs]))
+
+
+# %% Plot total cost per preset and project as bars
+
+
+@block
+@savefig
+def plot_mean_cost_per_project():
+    plot_data = data.groupby(["preset", "project"])
+    mean_costs = [
+        [plot_data.get_group((preset, project))["usage.cost"].mean() for project in PROJECTS] for preset in PRESETS
+    ]
+
+    x = np.arange(len(PROJECTS)) * 5
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 6))
+
+    ax.bar(x=x, height=mean_costs[0], color=cmap_colors[0], width=1)
+    ax.bar(x=x + 1, height=mean_costs[1], color=cmap_colors[1], width=1)
+    ax.bar(x=x + 2, height=mean_costs[2], color=cmap_colors[2], width=1)
+    ax.bar(x=x + 3, height=mean_costs[3], color=cmap_colors[3], width=1)
+    ax.set_xlim((-2, 50))
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x*100:.1f}¢")
+
+    ax.set_xticks(x + 1.5)
+    ax.set_xticklabels(PROJECTS, rotation=90)
+    fig.legend(PRESET_NAMES, loc=(0.1, 0.8))
+
+    return fig, list(zip(PRESETS, [list(zip(PROJECTS, c)) for c in mean_costs]))
+
+
+# %% Plot mean num tokens per mutant
 
 
 @block
 @savefig
 def plot_num_tokens_per_mutant():
-    return plot_bar_per_group(
-        data.groupby("preset"),
-        list(zip(PRESETS, PRESET_NAMES)),
-        [
-            ("Prompt tokens (cached)", lambda df: df["usage.cached_tokens"].mean()),
-            ("Prompt tokens (uncached)", lambda df: df["usage.uncached_prompt_tokens"].mean()),
-            ("Completion tokens", lambda df: df["usage.completion_tokens"].mean()),
-        ],
-    )
+    grouped_data = data.groupby("preset")
+    values = [
+        [grouped_data.get_group(preset)[col].mean() for preset in PRESETS]
+        for col in ["usage.cached_tokens", "usage.uncached_prompt_tokens", "usage.completion_tokens"]
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    for i in range(len(values)):
+        ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i])
+
+    ax.set_xticks(np.arange(4))
+    ax.set_xticklabels(PRESET_NAMES, rotation=90)
+    labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
+    fig.legend(labels, loc="upper left")
+
+    return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
 
 # %% Plot mean cost for one mutant
@@ -2142,14 +2256,55 @@ def plot_num_tokens_per_mutant():
 @block
 @savefig
 def plot_cost_per_mutant():
-    return plot_bar_per_group(
-        data.groupby("preset"),
-        list(zip(PRESETS, PRESET_NAMES)),
+    grouped_data = data.groupby("preset")
+    values = [
+        [grouped_data.get_group(preset)[col].mean() for preset in PRESETS]
+        for col in ["usage.cost.cached_tokens", "usage.cost.uncached_prompt_tokens", "usage.cost.completion_tokens"]
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    for i in range(len(values)):
+        ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i])
+
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x*100:.1f}¢")
+    ax.set_xticks(np.arange(4))
+    ax.set_xticklabels(PRESET_NAMES, rotation=90)
+    labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
+    fig.legend(
+        labels,
+        loc="upper left",
+    )
+    return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
+
+
+# %% Mann Whitney U test for tokens per mutant
+
+
+@block
+def mannwhitneyu_tokens_per_mutant():
+    grouped_data = data.groupby("preset")
+    mannwhitneyu_test(
         [
-            ("Cost for prompt tokens (cached)", lambda df: df["usage.cost.cached_tokens"].mean()),
-            ("Cost for prompt tokens (uncached)", lambda df: df["usage.cost.uncached_prompt_tokens"].mean()),
-            ("Cost for completion tokens", lambda df: df["usage.cost.completion_tokens"].mean()),
+            grouped_data.get_group(preset)["usage.cached_tokens"]
+            + grouped_data.get_group(preset)["usage.uncached_prompt_tokens"]
+            + grouped_data.get_group(preset)["usage.completion_tokens"]
+            for preset in PRESETS
         ],
+        PRESETS,
+        "mannwhitneyu_plot_tokens_per_mutant.csv",
+    )
+
+
+# %% Mann Whitney U test for cost per mutant
+
+
+@block
+def mannwhitneyu_cost_per_mutant():
+    grouped_data = data.groupby("preset")
+    mannwhitneyu_test(
+        [grouped_data.get_group(preset)["usage.cost"] for preset in PRESETS],
+        PRESETS,
+        "mannwhitneyu_plot_cost_per_mutant.csv",
     )
 
 
@@ -2167,15 +2322,49 @@ class ____Success_Rate:  # mark this in the outline
 @block
 @savefig
 def plot_outcomes():
-    return plot_bar_per_group(
-        data.groupby("preset"),
-        list(zip(PRESETS, PRESET_NAMES)),
-        [
-            ("Success", lambda df: (df["outcome"] == SUCCESS).mean()),
-            ("Claimed Equivalent", lambda df: (df["outcome"] == EQUIVALENT).mean()),
-            ("Failed", lambda df: (df["outcome"] == FAIL).mean()),
-        ],
-        customization=lambda fig, ax: ax.yaxis.set_major_formatter(format_perecent()),
+    grouped_data = data.groupby("preset")
+    values = [
+        [(grouped_data.get_group(preset)["outcome"] == outcome).mean() for preset in PRESETS] for outcome in OUTCOMES
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    for i in range(len(values)):
+        ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i])
+
+    ax.yaxis.set_major_formatter(format_perecent())
+    ax.set_xticks(np.arange(4))
+    ax.set_xticklabels(PRESET_NAMES, rotation=90)
+    labels = OUTCOME_NAMES
+    fig.legend(
+        labels,
+        loc="upper left",
+    )
+    return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
+
+
+# %% Mann Whitney U test for mutant kills
+
+
+@block
+def mannwhitneyu_outcome_killed():
+    grouped_data = data.groupby("preset")
+    mannwhitneyu_test(
+        [grouped_data.get_group(preset)["mutant_killed"] for preset in PRESETS],
+        PRESETS,
+        "mannwhitneyu_plot_outcome_killed.csv",
+    )
+
+
+# %% Mann Whitney U test for equivalence claims
+
+
+@block
+def mannwhitneyu_outcome_claimed_equivalent():
+    grouped_data = data.groupby("preset")
+    mannwhitneyu_test(
+        [grouped_data.get_group(preset)["claimed_equivalent"] for preset in PRESETS],
+        PRESETS,
+        "mannwhitneyu_plot_outcome_claimed_equivalent.csv",
     )
 
 
@@ -2750,12 +2939,39 @@ class ____Number_Of_Turns:  # mark this in the outline
 @block
 @savefig
 def plot_num_turns():
+    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
     return plot_violin_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
-        "Number of turns (responses containing runnable code)",
+        "Number of turns",
         lambda df: df["num_turns"],
+    ), plot_data.transpose().to_dict()
+
+
+# %% Mann Whitney U test for number of turns
+
+
+@block
+def mannwhitneyu_plot_num_turns():
+    plot_data = data.groupby("preset")["num_turns"]
+    mannwhitneyu_test(
+        [plot_data.get_group(preset) for preset in PRESETS], PRESET_NAMES, "mannwhitneyu_plot_num_turns.csv"
     )
+
+
+# %% Number of turns
+
+
+@block
+@savefig
+def plot_num_turns():
+    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
+    return plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of turns",
+        lambda df: df["num_turns"],
+    ), plot_data.transpose().to_dict()
 
 
 # %% Number of turns (excluding turns after an equivalence claim is made)
@@ -2780,6 +2996,17 @@ def plot_num_turns_before_equivalence_claim():
     )
 
 
+# %% Mann Whitney U test for number of completions
+
+
+@block
+def mannwhitneyu_plot_num_completions():
+    plot_data = data.groupby("preset")["num_completions"]
+    mannwhitneyu_test(
+        [plot_data.get_group(preset) for preset in PRESETS], PRESET_NAMES, "mannwhitneyu_plot_num_completions.csv"
+    )
+
+
 # %% Number of completions
 
 
@@ -2790,12 +3017,13 @@ def plot_num_turns_before_equivalence_claim():
 @block
 @savefig
 def plot_num_completions():
+    plot_data = data.groupby("preset")["num_completions"].agg(AGGS)
     return plot_violin_per_group(
         data.groupby("preset"),
         list(zip(PRESETS, PRESET_NAMES)),
-        "Number of completions (all LLM-generated responses)",
+        "Number of completions",
         lambda df: df["num_completions"],
-    )
+    ), plot_data.transpose().to_dict()
 
 
 # %% Number of completions (excluding completions after an equivalence claim is made)
@@ -2902,6 +3130,21 @@ def plot_num_completions_before_equivalence_claim_per_outcome():
         plots.append(plot)
 
     return plots
+
+
+# %% Paper RQ 3: Can our approaches reliably detect equivalent mutants
+# ======================================================================================================================
+
+
+class ____RQ_3:  # mark this in the outline
+    pass
+
+
+# %% Write stats about sampled mutants.
+
+data[(data["preset"] == PRESETS[0]) & data["sampled"]][["sample.equivalent", "sample.unsure"]].map(int).agg(
+    ["sum", "mean", "count"]
+).to_csv(OUTPUT_PATH / "sampled_mutants_results.csv")
 
 
 # %% sandbox 2
