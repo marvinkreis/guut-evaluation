@@ -15,8 +15,9 @@
 #     - Indexed by ("index", "mutant_id") = ("index", "project", "target_path", "mutant_op", "occurrence")
 #     - Available columns: TODO
 #
-# - aggregated_pynguin_data
-#     - TODO: can this be replaced with a simple groupby?
+# - raw_pynguin_data
+#     - Indexed by ("RunId", "TargetModule")
+#     - Each row contains the results from running Pynguin on one module.
 #
 # - sample_data
 #
@@ -694,7 +695,6 @@ class PynguinCosmicRayRunSummary(NamedTuple):
 
 
 best_pynguin_runs: Dict[Project, PynguinCosmicRayRunSummary] = {}
-aggregated_pynguin_data = dict(project=[], index=[], killed=[])
 for project in pynguin_data["project"].unique():
     for index in range(30):
         index += 1
@@ -709,13 +709,23 @@ for project in pynguin_data["project"].unique():
         )
 
         num_kills = target_data["killed"].sum()
-        aggregated_pynguin_data["project"].append(project)
-        aggregated_pynguin_data["index"].append(index)
-        aggregated_pynguin_data["killed"].append(num_kills)
         max_index, max_kills = best_pynguin_runs.get(project, (-1, -1))
         if num_kills > max_kills:
             best_pynguin_runs[project] = PynguinCosmicRayRunSummary(index, num_kills)
-aggregated_pynguin_data = pd.DataFrame(aggregated_pynguin_data)
+
+
+# %% Read raw Pynguin results
+
+raw_pynguin_data = pd.read_csv(PYNGUIN_TESTS_DIR / "results.csv")
+raw_pynguin_data["TotalCost"] = (
+    raw_pynguin_data["TotalTime"] / 1000000000 / 3600 * 0.0384
+)  # 0.0384US-$/h fuer eine vergleichbare AWS-VM
+raw_pynguin_data["Package"] = raw_pynguin_data["TargetModule"].map(lambda m: m.split(".")[0])
+raw_pynguin_data["Project"] = raw_pynguin_data["Package"].map(lambda p: PACKAGE_TO_PROJECT.get(p, "unknown"))
+raw_pynguin_data["Index"] = raw_pynguin_data["RandomSeed"] + 1
+raw_pynguin_data["Excluded"] = raw_pynguin_data.apply(
+    lambda row: is_pynguin_run_excluded(row["Project"], row["Index"]), axis=1
+)
 
 
 # %% Check which mutants are killed by pynguin runs
@@ -1946,7 +1956,7 @@ def distribution_plot(
         order=order,
         orient=orient,
         palette=palette,
-        size=2,
+        size=2.5,
         **kwargs,
     )
 
@@ -2313,11 +2323,27 @@ def plot_sum_cost_per_project_():
 
 @block
 @savefig
-def plot_sum_cost_per_project():
+def plot_sum_cost_per_project_with_avg_pynguin_cost():
     plot_data = data.groupby(["preset", "project"])
     costs = [[plot_data.get_group((preset, project))["usage.cost"].sum() for project in PROJECTS] for preset in PRESETS]
 
-    x = np.arange(len(PROJECTS)) * 5
+    # Add Pynguin costs
+
+    grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    pynguin_costs = []
+    for project in PROJECTS:
+        cost_for_project = 0
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            cost_for_project += group["TotalCost"].sum()
+
+        pynguin_costs.append(cost_for_project / get_num_pynguin_runs_per_project(project))
+    costs.append(pynguin_costs)
+
+    x = np.arange(len(PROJECTS)) * 6
 
     fig, ax = plt.subplots(layout="constrained", figsize=(8, 6))
 
@@ -2325,15 +2351,63 @@ def plot_sum_cost_per_project():
     ax.bar(x=x + 1, height=costs[1], color=cmap_colors[1], width=1)
     ax.bar(x=x + 2, height=costs[2], color=cmap_colors[2], width=1)
     ax.bar(x=x + 3, height=costs[3], color=cmap_colors[3], width=1)
-    ax.set_xlim((-2, 50))
+    ax.bar(x=x + 4, height=costs[4], color=cmap_colors[4], width=1)
+    ax.set_xlim((-2, 60))
     ax.yaxis.set_major_formatter(lambda x, pos: f"{x:.0f}$")
 
-    ax.set_xticks(x + 1.5)
+    ax.set_xticks(x + 2)
     ax.set_xticklabels(PROJECTS, rotation=90)
-    fig.legend(PRESET_NAMES, loc=(0.1, 0.8))
+    labels = PRESET_NAMES + ["Pynguin (avg)"]
+    fig.legend(labels, loc=(0.1, 0.8))
     ax.set_ylabel("Cost for each project")
 
-    return fig, list(zip(PRESETS, [list(zip(PROJECTS, c)) for c in costs]))
+    return fig, list(zip(labels, [list(zip(PROJECTS, c)) for c in costs]))
+
+
+# %% Plot total cost per preset and project as bars
+
+
+@block
+@savefig
+def plot_sum_cost_per_project_with_total_pynguin_cost():
+    plot_data = data.groupby(["preset", "project"])
+    costs = [[plot_data.get_group((preset, project))["usage.cost"].sum() for project in PROJECTS] for preset in PRESETS]
+
+    # Add Pynguin costs
+
+    grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    pynguin_costs = []
+    for project in PROJECTS:
+        cost_for_project = 0
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            cost_for_project += group["TotalCost"].sum()
+
+        pynguin_costs.append(cost_for_project)  # / get_num_pynguin_runs_per_project(project))
+    costs.append(pynguin_costs)
+
+    x = np.arange(len(PROJECTS)) * 6
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 6))
+
+    ax.bar(x=x, height=costs[0], color=cmap_colors[0], width=1)
+    ax.bar(x=x + 1, height=costs[1], color=cmap_colors[1], width=1)
+    ax.bar(x=x + 2, height=costs[2], color=cmap_colors[2], width=1)
+    ax.bar(x=x + 3, height=costs[3], color=cmap_colors[3], width=1)
+    ax.bar(x=x + 4, height=pynguin_costs, color=cmap_colors[4], width=1)
+    ax.set_xlim((-2, 60))
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x:.0f}$")
+
+    ax.set_xticks(x + 2)
+    ax.set_xticklabels(PROJECTS, rotation=90)
+    labels = PRESET_NAMES + ["Pynguin (total)"]
+    fig.legend(labels, loc=(0.1, 0.8))
+    ax.set_ylabel("Cost for each project")
+
+    return fig, list(zip(labels, [list(zip(PROJECTS, c)) for c in costs]))
 
 
 # %% Plot total cost per preset and project as bars
@@ -2773,7 +2847,7 @@ def plot_line_coverage_with_pynguin_distplot():
     values.append(num_avg_pynguin_covered)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (all)"]
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
     distribution_plot(values, ax=ax)
 
     ax.set_xticks(np.arange(len(values)))
@@ -2829,7 +2903,7 @@ def plot_branch_coverage_with_pynguin_distplot():
     values.append(num_avg_pynguin_covered)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (all)"]
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
     distribution_plot(values, ax=ax)
 
     ax.set_xticks(np.arange(len(values)))
@@ -3029,7 +3103,7 @@ def plot_mutation_score_with_pynguin_distplot():
     values.append(num_all_pynguin)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (all)"]
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
     distribution_plot(values, ax=ax)
 
     ax.set_xticks(np.arange(len(values)))
@@ -3224,8 +3298,21 @@ def plot_number_of_test_cases_distplot():
             num_all_pynguin_tests.append(num_tests)
     values.append(num_all_pynguin_tests)
 
+    # Pynguin runs
+    # num_combined_pynguin_tests = []
+    # for project in PROJECTS:
+    #     acc = 0
+    #     for index in range(1, 31):
+    #         if is_pynguin_run_excluded(project, index):
+    #             continue
+
+    #         acc += pynguin_num_tests_map.get((project, index), 0)
+
+    #     num_combined_pynguin_tests.append(acc)
+    # values.append(num_combined_pynguin_tests)
+
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    labels = PRESET_NAMES + ["Pynguin"]
+    labels = PRESET_NAMES + ["Pynguin (individual)"]  # , "Pynguin (combined)"]
     ax.set_xticks(np.arange(len(values)))
     ax.set_xticklabels(labels, rotation=90)
     ax.set_ylabel("Number of tests")
@@ -3544,12 +3631,90 @@ def plot_number_of_killed_and_unkilled_equivalences():
 
 
 # %% sandbox 2
+
+data[(data["preset"] == PRESETS[0]) & data["sampled"]].groupby("project")["id"].count()
 # %% sandbox 3
+
+data.groupby(["preset", "project"])["usage.cost"].sum()
+
+
 # %% sandbox 4
 
 
-data[data["mutant_killed"]]["num_final_test_cases"].agg(["min", "max", "mean"])
+raw_pynguin_data[(~raw_pynguin_data["Excluded"]) & (raw_pynguin_data["Project"].isin(PROJECTS))].groupby(
+    ["Project", "Index"]
+)["TotalCost"].sum().groupby("Project").sum()
 
-# %% sandbox 4
+# %% sandbox 5
 
-seaborn
+raw_pynguin_data[(~raw_pynguin_data["Excluded"]) & (raw_pynguin_data["Project"].isin(PROJECTS))].groupby(
+    ["Project", "Index"]
+)["TotalCost"].sum().groupby("Project").mean()
+
+
+# %% Minimize test suites
+
+
+def minimize_test_suite_by_ms(data) -> int:
+    selected_tests = set()
+
+    for index, row in data.iterrows():
+        failing_tests = row["cosmic_ray_full.failing_tests"]
+
+        if not selected_tests.isdisjoint(failing_tests):
+            continue
+
+        for test_id in failing_tests:
+            if test_id not in selected_tests:
+                selected_tests.add(test_id)
+                break
+
+    return len(selected_tests)
+
+
+def minimize_test_suite_by_line_coverage(data) -> int:
+    selected_tests = set()
+    seen_covered_lines = set()
+
+    for index, row in data.iterrows():
+        covered_lines = row["coverage.covered_line_ids"]
+
+        if seen_covered_lines.issuperset(covered_lines):
+            continue
+
+        selected_tests.add(row["long_id"])
+        seen_covered_lines.update(covered_lines)
+
+    return len(selected_tests)
+
+
+def minimize_test_suite_by_branch_coverage(data) -> int:
+    selected_tests = set()
+    seen_covered_lines = set()
+
+    for index, row in data.iterrows():
+        covered_lines = row["coverage.covered_branch_ids"]
+
+        if seen_covered_lines.issuperset(covered_lines):
+            continue
+
+        selected_tests.add(row["long_id"])
+        seen_covered_lines.update(covered_lines)
+
+    return len(selected_tests)
+
+
+@block
+def minimize_test_suites():
+    grouped_data = data.groupby("preset")
+
+    for preset in PRESETS:
+        print(f"\n{preset}")
+
+        group = grouped_data.get_group(preset)
+        group = group[group["mutant_killed"]]
+
+        print(f"unminimized: {len(group)}")
+        print(f"mimimized by MS: {minimize_test_suite_by_ms(group)}")
+        print(f"mimimized by line coverage: {minimize_test_suite_by_line_coverage(group)}")
+        print(f"mimimized by branch coverage: {minimize_test_suite_by_branch_coverage(group)}")
