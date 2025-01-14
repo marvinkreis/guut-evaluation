@@ -58,6 +58,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, Callable
 from scipy.stats import mannwhitneyu
+from collections import defaultdict
 
 import matplotlib.pylab as plt
 import numpy as np
@@ -262,7 +263,7 @@ class LongId(NamedTuple):
     id: str
 
     @staticmethod
-    def parse(long_id: str) -> "LongId":
+    def parse_quoted(long_id: str) -> "LongId":
         parts = long_id.split("_")
         preset = "_".join(parts[:3])
         package = "_".join(parts[3:-1])
@@ -368,6 +369,21 @@ else:
 
 
 data["project"] = data["problem.module_path"].map(lambda path: PACKAGE_TO_PROJECT[path.rsplit("/")[-1]])
+
+
+# %% Add escaped long id to data
+
+
+FILENAME_REPLACEMENET_REGEX = r"[^0-9a-zA-Z]+"
+
+
+def escape_path(name: str) -> str:
+    return re.sub(FILENAME_REPLACEMENET_REGEX, "_", name)
+
+
+@block
+def add_clean_long_id_to_data():
+    data["escaped_long_id"] = data["long_id"].map(escape_path)
 
 
 # %% Add mutant identifier to data
@@ -494,7 +510,7 @@ def read_coverage():
     map = {}
     for coverage_path in RESULTS_DIR.glob("*/coverage/coverage.json"):
         results_dir = (coverage_path / ".." / "..").resolve()
-        id = LongId.parse(results_dir.name)
+        id = LongId.parse_quoted(results_dir.name)
         with coverage_path.open("r") as f:
             coverage_json = json.load(f)
         map[(id.preset, id.project)] = read_coverage_py_json(coverage_json)
@@ -616,7 +632,7 @@ def add_cosmic_ray_results_to_data():
     # Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
     for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
         results_dir = (mutants_path / ".." / "..").resolve()
-        id = LongId.parse(results_dir.name)
+        id = LongId.parse_quoted(results_dir.name)
         cosmic_ray_results[(id.project, id.preset, "exitfirst")] = read_mutant_results(
             results_dir / "cosmic-ray" / "mutants.sqlite", id.project
         )
@@ -654,6 +670,19 @@ def add_cosmic_ray_results_to_data():
         ),
         axis=1,
     )
+
+
+# %% Helper to get kill per test
+
+
+def get_kills_per_test(df):
+    kills_per_test = defaultdict(set)
+    for index, row in df.iterrows():
+        failing_tests = row["cosmic_ray_full.failing_tests"]
+        mutant_id = row["mutant_id"]
+        for test_id in failing_tests:
+            kills_per_test[test_id].add(mutant_id)
+    return kills_per_test
 
 
 # %% Read Pynguin cosmic-ray results
@@ -1269,7 +1298,6 @@ sampled_mutants = sample_mutants()
 # %% Read sample data
 
 
-@block
 def add_sample_results_to_data():
     sample_data = pd.read_csv(REPO_PATH / "samples" / "sampled_mutants.csv")
     column_mapping = {
@@ -1304,14 +1332,21 @@ def add_sample_results_to_data():
             return True
         return value
 
-    sample_data = {sample_row_to_mutant_id(row): sample_row_to_dict(row) for _, row in sample_data.iterrows()}
+    sample_data_map = {sample_row_to_mutant_id(row): sample_row_to_dict(row) for _, row in sample_data.iterrows()}
 
     for name in column_mapping.values():
         data[name] = data["mutant_id"].map(
-            lambda mutant_id: convert_csv_value(sample_data[mutant_id][name]) if mutant_id in sample_data else None
+            lambda mutant_id: convert_csv_value(sample_data_map[mutant_id][name])
+            if mutant_id in sample_data_map
+            else None
         )
         # data[name] = data[name].map(lambda val: None if np.isnan(val) else None)
     data["sampled"] = data["sample.equivalent"].map(lambda b: b is not None)
+
+    return sample_data
+
+
+sample_data = add_sample_results_to_data()
 
 
 # %% Count number of final test cases to data
@@ -1332,6 +1367,21 @@ def add_number_of_final_test_cases():
     data["num_final_test_cases"] = (
         data["tests"].map(find_killing_test).map(lambda x: x["code"] if x else None).map(parse_number_of_test_cases)
     )
+
+
+# Number of test cases per test
+
+
+def compute_num_cases_per_test():
+    cases_per_test = {}
+
+    for index, row in data.iterrows():
+        cases_per_test[row["escaped_long_id"]] = row["num_final_test_cases"]
+
+    return cases_per_test
+
+
+num_cases_per_test = compute_num_cases_per_test()
 
 
 # %% Count Pynguin test cases
@@ -1365,6 +1415,23 @@ def count_pynguin_test_cases():
 
 pynguin_num_tests_map = count_pynguin_test_cases()
 
+# %% Add number of direct kills to data
+
+
+@block
+def add_num_kills():
+    kills = {}
+    for index, row in data.iterrows():
+        mutant_id = row["mutant_id"]
+        if row["mutant_killed"]:
+            kills[mutant_id] = kills.get(mutant_id, []) + [row["preset"]]
+
+    data["mutant.kills"] = data.apply(
+        lambda row: kills.get(row["mutant_id"], []),
+        axis=1,
+    )
+    data["mutant.num_kills"] = data["mutant.kills"].map(len)
+
 
 # %% Print memory usage
 
@@ -1377,7 +1444,7 @@ with open("/proc/self/status") as f:
 # %% Print available columns (data_columns)
 
 
-cols = list(data.columns)
+cols = sorted(list(data.columns))
 mid1 = int(((len(cols) + 1) // 3))
 mid2 = int(((len(cols) + 1) // 3) * 2)
 for x, y, z in zip(cols[:mid1] + [""], cols[mid1:mid2] + [""], cols[mid2:] + [""]):
@@ -1758,7 +1825,7 @@ def query_group(grouped_data, group, fun, default):
 
 def plot_bar_per_group(
     grouped_data: Any,
-    groups: List[Tuple[str, str]],
+    groups: List[Tuple[Any, str]],
     cols: List[Tuple[str, Callable[[Any], Any]]],
     customization: Callable[[Any, Any], None] | None = None,
 ):
@@ -3576,17 +3643,44 @@ class ____RQ_3:  # mark this in the outline
     pass
 
 
+# %% Number of mutants by num equiv claims
+
+data[(data["preset"] == PRESETS[0])].groupby("mutant.num_equivalence_claims")["mutant_id"].count()
+
+# %% Number of unkilled mutants (direct) by num equiv claims
+
+data[(data["preset"] == PRESETS[0]) & (data["mutant.num_kills"] == 0)].groupby("mutant.num_equivalence_claims")[
+    "mutant_id"
+].count()
+
+# %% Number of unkilled mutants (LLM-generated tests) by num equiv claims
+
+data[(data["preset"] == PRESETS[0]) & (~data["cosmic_ray.killed_by_any"])].groupby("mutant.num_equivalence_claims")[
+    "mutant_id"
+].count()
+
+
+# %% Number of unkilled mutants (LLM-generated tests + Pynguin tests) by num equiv claims
+
+data[
+    (data["preset"] == PRESETS[0]) & (~data["cosmic_ray.killed_by_any"]) & (~data["pynguin.cosmic_ray.killed_by_any"])
+].groupby("mutant.num_equivalence_claims")["mutant_id"].count()
+
+
 # %% Write stats about sampled mutants.
 
-data[(data["preset"] == PRESETS[0]) & data["sampled"]][
-    ["sample.equivalent", "sample.unsure", "mutant.num_equivalence_claims"]
-].map(int).agg(["sum", "mean", "count"]).to_csv(OUTPUT_PATH / "sampled_mutants_results.csv")
 
-data[(data["preset"] == PRESETS[0]) & data["sampled"]][
-    ["sample.equivalent", "sample.unsure", "mutant.num_equivalence_claims"]
-].map(int).groupby("mutant.num_equivalence_claims").agg(["sum", "mean", "count"]).to_csv(
-    OUTPUT_PATH / "sampled_mutants_results_per_num_claims.csv"
-)
+@block
+def write_sampled_mutants_tables():
+    data[(data["preset"] == PRESETS[0]) & data["sampled"]][
+        ["sample.equivalent", "sample.unsure", "mutant.num_equivalence_claims"]
+    ].map(int).agg(["sum", "mean", "count"]).to_csv(OUTPUT_PATH / "sampled_mutants_results.csv")
+
+    data[(data["preset"] == PRESETS[0]) & data["sampled"]][
+        ["sample.equivalent", "sample.unsure", "mutant.num_equivalence_claims"]
+    ].map(int).groupby("mutant.num_equivalence_claims").agg(["sum", "mean", "count"]).to_csv(
+        OUTPUT_PATH / "sampled_mutants_results_per_num_claims.csv"
+    )
 
 
 # %% Plot number of killed and unkilled equivalent mutants
@@ -3655,10 +3749,10 @@ raw_pynguin_data[(~raw_pynguin_data["Excluded"]) & (raw_pynguin_data["Project"].
 # %% Minimize test suites
 
 
-def minimize_test_suite_by_ms(data) -> int:
+def minimize_test_suite_by_ms_old(df):
     selected_tests = set()
 
-    for index, row in data.iterrows():
+    for index, row in df.iterrows():
         failing_tests = row["cosmic_ray_full.failing_tests"]
 
         if not selected_tests.isdisjoint(failing_tests):
@@ -3669,14 +3763,31 @@ def minimize_test_suite_by_ms(data) -> int:
                 selected_tests.add(test_id)
                 break
 
-    return len(selected_tests)
+    return selected_tests
 
 
-def minimize_test_suite_by_line_coverage(data) -> int:
+def minimize_test_suite_by_ms(df):
+    kills_per_test = get_kills_per_test(df)
+    tests_with_kills = list(kills_per_test.items())
+    tests_with_kills = sorted(tests_with_kills, key=lambda x: len(x[1]), reverse=True)
+
+    selected_tests = set()
+    killed_mutants = set()
+    for test, kills in tests_with_kills:
+        if kills.issubset(killed_mutants):
+            continue
+
+        selected_tests.add(test)
+        killed_mutants.update(kills)
+
+    return selected_tests
+
+
+def minimize_test_suite_by_line_coverage(df):
     selected_tests = set()
     seen_covered_lines = set()
 
-    for index, row in data.iterrows():
+    for index, row in df.iterrows():
         covered_lines = row["coverage.covered_line_ids"]
 
         if seen_covered_lines.issuperset(covered_lines):
@@ -3685,14 +3796,14 @@ def minimize_test_suite_by_line_coverage(data) -> int:
         selected_tests.add(row["long_id"])
         seen_covered_lines.update(covered_lines)
 
-    return len(selected_tests)
+    return selected_tests
 
 
-def minimize_test_suite_by_branch_coverage(data) -> int:
+def minimize_test_suite_by_branch_coverage(df):
     selected_tests = set()
     seen_covered_lines = set()
 
-    for index, row in data.iterrows():
+    for index, row in df.iterrows():
         covered_lines = row["coverage.covered_branch_ids"]
 
         if seen_covered_lines.issuperset(covered_lines):
@@ -3701,7 +3812,17 @@ def minimize_test_suite_by_branch_coverage(data) -> int:
         selected_tests.add(row["long_id"])
         seen_covered_lines.update(covered_lines)
 
-    return len(selected_tests)
+    return selected_tests
+
+
+def get_kills(group, suite):
+    kills_per_test = get_kills_per_test(group)
+    killed_mutants = set()
+
+    for test in suite:
+        killed_mutants.update(kills_per_test[test])
+
+    return killed_mutants
 
 
 @block
@@ -3712,9 +3833,120 @@ def minimize_test_suites():
         print(f"\n{preset}")
 
         group = grouped_data.get_group(preset)
-        group = group[group["mutant_killed"]]
 
-        print(f"unminimized: {len(group)}")
-        print(f"mimimized by MS: {minimize_test_suite_by_ms(group)}")
-        print(f"mimimized by line coverage: {minimize_test_suite_by_line_coverage(group)}")
-        print(f"mimimized by branch coverage: {minimize_test_suite_by_branch_coverage(group)}")
+        large_suite = set(group[group["mutant_killed"]]["escaped_long_id"])
+        minimized_suite = minimize_test_suite_by_ms(group)
+
+        # print(len(large_suite))
+        # print(len(minimized_suite))
+        # print(len(large_suite.intersection(minimized_suite)))
+
+        print(f"unminimized test files: {len(large_suite)}")
+        print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
+        print(f"unminimized kills: {len(get_kills(group, large_suite))}")
+
+        print(f"minimized by MS test files: {len(minimized_suite)}")
+        print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
+        print(f"minimized by MS kills: {len(get_kills(group, minimized_suite))}")
+
+        # print(f"minimized by line coverage: {minimize_test_suite_by_line_coverage(group)}")
+        # print(f"minimized by branch coverage: {minimize_test_suite_by_branch_coverage(group)}")
+
+    print("\nall presets")
+    large_suite = set(data[data["mutant_killed"]]["escaped_long_id"])
+    minimized_suite = minimize_test_suite_by_ms(data)
+
+    print(f"unminimized test files: {len(large_suite)}")
+    print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
+    print(f"unminimized kills: {len(get_kills(data, large_suite))}")
+
+    print(f"minimized by MS test files: {len(minimized_suite)}")
+    print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
+    print(f"minimized by MS kills: {len(get_kills(data, minimized_suite))}")
+
+    print(f"\nall killed mutants: {data[data["preset"] == PRESETS[0]]["cosmic_ray_full.killed_by_any"].sum()}")
+
+
+# %% Plot killed mutants by number of claims
+
+
+@block
+@savefig
+def plot_killed_mutants_by_num_claims():
+    plot_data = data[data["preset"] == PRESETS[0]].groupby("mutant.num_equivalence_claims")
+
+    num_killed_in_conversation = []
+    num_killed_cosmic_ray = []
+    num_unkilled = []
+
+    for i in [0, 1, 2, 3]:
+        group = plot_data.get_group(i)
+        claims_killed_other_conversation = group[(group["mutant.num_kills"] > 0)]
+        claims_killed_cosmic_ray = group[(group["mutant.num_kills"] == 0) & group["cosmic_ray_full.killed_by_any"]]
+        claims_unkilled = group[(group["mutant.num_kills"] == 0) & ~group["cosmic_ray_full.killed_by_any"]]
+        num_killed_in_conversation.append(len(claims_killed_other_conversation))
+        num_killed_cosmic_ray.append(len(claims_killed_cosmic_ray))
+        num_unkilled.append(len(claims_unkilled))
+
+    num_killed_in_conversation = np.array(num_killed_in_conversation)
+    num_killed_cosmic_ray = np.array(num_killed_cosmic_ray)
+    num_unkilled = np.array(num_unkilled)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(3.5, 6.5))
+    x = np.arange(len(num_unkilled))
+    ax.bar(x, num_killed_in_conversation, color=cmap_colors[0])
+    ax.bar(
+        x,
+        num_killed_cosmic_ray,
+        color=cmap_colors[2],
+        bottom=num_killed_in_conversation,
+    )
+    ax.bar(
+        x,
+        num_unkilled,
+        color=cmap_colors[4],
+        bottom=num_killed_in_conversation + +num_killed_cosmic_ray,
+    )
+    ax.set_xticks(x)
+    ax.set_xticklabels(["0", "1", "2", "3"], rotation=90)
+    ax.set_ylabel("Number of mutants")
+    ax.set_xlabel("Number equivalence claims")
+    fig.legend(
+        [
+            "Killed in con-\nversation",
+            "Killed by any\ngenerated test",
+            "Not killed",
+        ],
+        loc=(0.425, 0.8),
+    )
+    return fig
+
+
+# %% Check kill rate of claimed and unclaimed mutants
+
+# Not a good idea, I think. Construct validity?
+#   LLM claims mutants that it struggles with => LLM struggles with the mutants it claimed
+
+
+def check_kill_rate_of_claimed_and_unclaimed_mutants():
+    grouped_data = data.groupby("preset")
+
+    for preset in PRESETS:
+        group = grouped_data.get_group(preset)
+        group = group[~group["mutant_killed"]]
+
+        print(preset)
+        claimed = group[group["claimed_equivalent"]]["pynguin.cosmic_ray_full.killed_by_any"]
+        not_claimed = group[~group["claimed_equivalent"]]["pynguin.cosmic_ray_full.killed_by_any"]
+        print(f"claimed equivalent: {claimed.sum():4d} killed, {len(claimed) - claimed.sum():4d} alive")
+        print(f"       not claimed: {not_claimed.sum():4d} killed, {len(not_claimed) - not_claimed.sum():4d} alive")
+        print(mannwhitneyu(claimed, not_claimed))
+        print()
+
+
+# claimed = data[data["claimed_equivalent"]]["cosmic_ray_full.killed_by_own"]
+# not_claimed = data[~data["claimed_equivalent"]]["cosmic_ray_full.killed_by_own"]
+# print(f"claimed: {claimed.sum()} killed, {len(claimed) - claimed.sum()} alive")
+# print(f"not claimed: {not_claimed.sum()} killed, {len(not_claimed) - not_claimed.sum()} alive")
+# print(mannwhitneyu(claimed, not_claimed))
+# print()
