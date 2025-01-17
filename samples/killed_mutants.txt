@@ -1,0 +1,6 @@
+These mutants were later found to be killable by a LLM-generated test through cosmic-ray. At the time of sampling the mutants, the cosmic-ray data still contained some inconsistencies.
+
+flutils, moduleutils.py, core/ReplaceComparisonOperator_Is_Eq, 2
+flutils, txtutils.py, core/ReplaceComparisonOperator_GtE_Gt, 0
+httpie, cli/argparser.py, core/ReplaceComparisonOperator_NotEq_Gt, 0
+httpie, utils.py, core/ReplaceBinaryOperator_Mod_LShift, 1
