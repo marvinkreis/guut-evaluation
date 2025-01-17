@@ -60,6 +60,7 @@ from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, 
 from scipy.stats import mannwhitneyu
 from collections import defaultdict
 
+import plotly.graph_objects as go
 import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
@@ -2627,6 +2628,33 @@ def plot_outcomes():
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
 
+# %% Plot percentage of outcomes per project
+
+
+@block
+@savefig
+def plot_outcomes_by_project():
+    grouped_data = data.groupby("project")
+    values = [
+        [(grouped_data.get_group(project)["outcome"] == outcome).mean() for project in PROJECTS] for outcome in OUTCOMES
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    for i in range(len(values)):
+        ax.bar(x=np.arange(len(PROJECTS)), bottom=np.sum(values[:i], axis=0), height=values[i])
+
+    ax.yaxis.set_major_formatter(format_perecent())
+    ax.set_xticks(np.arange(len(PROJECTS)))
+    ax.set_xticklabels(PROJECTS, rotation=90)
+    labels = OUTCOME_NAMES
+    fig.legend(
+        labels,
+        loc="upper left",
+    )
+    ax.set_ylabel("Percentage of outcomes")
+    return fig, list(zip(labels, [list(zip(PROJECTS, val)) for val in values]))
+
+
 # %% Mann Whitney U test for mutant kills
 
 
@@ -2993,7 +3021,7 @@ def line_coverage_mannwhitneyu_test():
     for preset in PRESETS:
         num_covered = []
         for project in PROJECTS:
-            num_covered.append(len(coverage_map[(preset, project)].executed_lines))
+            num_covered.append(len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project]))
         values.append(num_covered)
 
     # Pynguin combined runs
@@ -3005,7 +3033,7 @@ def line_coverage_mannwhitneyu_test():
             coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
             covered_lines_per_project.update(coverage.executed_lines)
 
-        num_combined_pynguin_covered.append(len(covered_lines_per_project))
+        num_combined_pynguin_covered.append(len(covered_lines_per_project) / len(all_seen_lines_map[project]))
     values.append(num_combined_pynguin_covered)
 
     # Pynguin avg runs
@@ -3015,12 +3043,21 @@ def line_coverage_mannwhitneyu_test():
 
         for index in range(1, 31):
             coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_covered_lines_per_project += len(coverage.executed_lines)
+            num_covered_lines_per_project += len(coverage.executed_lines) / len(all_seen_lines_map[project])
 
         num_avg_pynguin_covered.append(num_covered_lines_per_project / get_num_pynguin_runs_per_project(project))
     values.append(num_avg_pynguin_covered)
 
-    names = PRESETS + ["pynguin_combined", "pynguin_avg"]
+    # Pynguin individual runs
+    num_individual_pynguin_covered = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_individual_pynguin_covered.append(len(coverage.executed_lines) / len(all_seen_lines_map[project]))
+
+    values.append(num_individual_pynguin_covered)
+
+    names = PRESETS + ["pynguin_combined", "pynguin_avg", "pynguin_individual"]
     mannwhitneyu_test(values, names, "mannwhitneyu_plot_line_coverage_with_pynugin.csv")
 
 
@@ -3033,7 +3070,9 @@ def branch_coverage_mannwhitneyu_test():
     for preset in PRESETS:
         num_covered = []
         for project in PROJECTS:
-            num_covered.append(len(coverage_map[(preset, project)].executed_branches))
+            num_covered.append(
+                len(coverage_map[(preset, project)].executed_branches) / len(all_seen_branches_map[project])
+            )
         values.append(num_covered)
 
     # Pynguin combined runs
@@ -3045,7 +3084,7 @@ def branch_coverage_mannwhitneyu_test():
             coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
             covered_branches_per_project.update(coverage.executed_branches)
 
-        num_combined_pynguin_covered.append(len(covered_branches_per_project))
+        num_combined_pynguin_covered.append(len(covered_branches_per_project) / len(all_seen_branches_map[project]))
     values.append(num_combined_pynguin_covered)
 
     # Pynguin avg runs
@@ -3055,12 +3094,21 @@ def branch_coverage_mannwhitneyu_test():
 
         for index in range(1, 31):
             coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_covered_branches_per_project += len(coverage.executed_branches)
+            num_covered_branches_per_project += len(coverage.executed_branches) / len(all_seen_branches_map[project])
 
         num_avg_pynguin_covered.append(num_covered_branches_per_project / get_num_pynguin_runs_per_project(project))
     values.append(num_avg_pynguin_covered)
 
-    names = PRESETS + ["pynguin_combined", "pynguin_avg"]
+    # Pynguin individual runs
+    num_individual_pynguin_covered = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_individual_pynguin_covered.append(len(coverage.executed_branches) / len(all_seen_branches_map[project]))
+
+    values.append(num_individual_pynguin_covered)
+
+    names = PRESETS + ["pynguin_combined", "pynguin_avg", "pynguin_individual"]
     mannwhitneyu_test(values, names, "mannwhitneyu_plot_branch_coverage_with_pynugin.csv")
 
 
@@ -3451,6 +3499,21 @@ def plot_num_turns():
     ), plot_data.transpose().to_dict()
 
 
+# %% Number of turns for a successful test
+
+
+@block
+@savefig
+def plot_num_turns_success():
+    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
+    return plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of iterations",
+        lambda df: df[df["mutant_killed"]]["num_turns"],
+    ), plot_data.transpose().to_dict()
+
+
 # %% Number of turns distribution plot
 
 
@@ -3550,89 +3613,89 @@ def plot_num_completions_before_equivalence_claim():
 # %% Number of turns per outcome
 
 
-@block
-@savefig
-def plot_num_turns_per_outcome():
-    preset_data = data.groupby("preset")
-    plots = []
-
-    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot = plot_violin_per_group(
-            preset_data.get_group(preset).groupby("outcome"),
-            list(zip(OUTCOMES, OUTCOME_NAMES)),
-            "Number of turns",
-            lambda df: df["num_turns"],
-            customization=lambda fig, ax: ax.set_title(preset_name),
-        )
-        plots.append(plot)
-
-    return plots
+# @block
+# @savefig
+# def plot_num_turns_per_outcome():
+#     preset_data = data.groupby("preset")
+#     plots = []
+#
+#     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+#         plot = plot_violin_per_group(
+#             preset_data.get_group(preset).groupby("outcome"),
+#             list(zip(OUTCOMES, OUTCOME_NAMES)),
+#             "Number of turns",
+#             lambda df: df["num_turns"],
+#             customization=lambda fig, ax: ax.set_title(preset_name),
+#         )
+#         plots.append(plot)
+#
+#     return plots
 
 
 # %% Number of turns per outcome (excluding turns after an equivalence claim is made)
 
 
-@block
-@savefig
-def plot_num_turns_before_equivalence_claim_per_outcome():
-    preset_data = data.groupby("preset")
-    plots = []
-
-    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot = plot_violin_per_group(
-            preset_data.get_group(preset).groupby("outcome"),
-            list(zip(OUTCOMES, OUTCOME_NAMES)),
-            "Number of turns before equivalence claim",
-            lambda df: df["num_turns_before_equivalence_claim"],
-            customization=lambda fig, ax: ax.set_title(preset_name),
-        )
-        plots.append(plot)
-
-    return plots
-
-
-# %% Number of completions
-
-
-@block
-@savefig
-def plot_num_completions_per_outcome():
-    preset_data = data.groupby("preset")
-    plots = []
-
-    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot = plot_violin_per_group(
-            preset_data.get_group(preset).groupby("outcome"),
-            list(zip(OUTCOMES, OUTCOME_NAMES)),
-            "Number of completions",
-            lambda df: df["num_completions"],
-            customization=lambda fig, ax: ax.set_title(preset_name),
-        )
-        plots.append(plot)
-
-    return plots
+# @block
+# @savefig
+# def plot_num_turns_before_equivalence_claim_per_outcome():
+#     preset_data = data.groupby("preset")
+#     plots = []
+#
+#     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+#         plot = plot_violin_per_group(
+#             preset_data.get_group(preset).groupby("outcome"),
+#             list(zip(OUTCOMES, OUTCOME_NAMES)),
+#             "Number of turns before equivalence claim",
+#             lambda df: df["num_turns_before_equivalence_claim"],
+#             customization=lambda fig, ax: ax.set_title(preset_name),
+#         )
+#         plots.append(plot)
+#
+#     return plots
 
 
 # %% Number of completions
 
 
-@block
-@savefig
-def plot_num_completions_before_equivalence_claim_per_outcome():
-    preset_data = data.groupby("preset")
-    plots = []
+# @block
+# @savefig
+# def plot_num_completions_per_outcome():
+#     preset_data = data.groupby("preset")
+#     plots = []
+#
+#     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+#         plot = plot_violin_per_group(
+#             preset_data.get_group(preset).groupby("outcome"),
+#             list(zip(OUTCOMES, OUTCOME_NAMES)),
+#             "Number of completions",
+#             lambda df: df["num_completions"],
+#             customization=lambda fig, ax: ax.set_title(preset_name),
+#         )
+#         plots.append(plot)
+#
+#     return plots
 
-    for preset, preset_name in zip(PRESETS, PRESET_NAMES):
-        plot = plot_violin_per_group(
-            preset_data.get_group(preset).groupby("outcome"),
-            list(zip(OUTCOMES, OUTCOME_NAMES)),
-            "Number of completions before equivalence claim",
-            lambda df: df["num_completions_before_equivalence_claim"],
-            customization=lambda fig, ax: ax.set_title(preset_name),
-        )
-        plots.append(plot)
 
-    return plots
+# %% Number of completions
+
+
+# @block
+# @savefig
+# def plot_num_completions_before_equivalence_claim_per_outcome():
+#     preset_data = data.groupby("preset")
+#     plots = []
+#
+#     for preset, preset_name in zip(PRESETS, PRESET_NAMES):
+#         plot = plot_violin_per_group(
+#             preset_data.get_group(preset).groupby("outcome"),
+#             list(zip(OUTCOMES, OUTCOME_NAMES)),
+#             "Number of completions before equivalence claim",
+#             lambda df: df["num_completions_before_equivalence_claim"],
+#             customization=lambda fig, ax: ax.set_title(preset_name),
+#         )
+#         plots.append(plot)
+#
+#     return plots
 
 
 # %% Paper RQ 3: Can our approaches reliably detect equivalent mutants
@@ -3643,28 +3706,37 @@ class ____RQ_3:  # mark this in the outline
     pass
 
 
-# %% Number of mutants by num equiv claims
-
-data[(data["preset"] == PRESETS[0])].groupby("mutant.num_equivalence_claims")["mutant_id"].count()
-
-# %% Number of unkilled mutants (direct) by num equiv claims
-
-data[(data["preset"] == PRESETS[0]) & (data["mutant.num_kills"] == 0)].groupby("mutant.num_equivalence_claims")[
-    "mutant_id"
-].count()
-
-# %% Number of unkilled mutants (LLM-generated tests) by num equiv claims
-
-data[(data["preset"] == PRESETS[0]) & (~data["cosmic_ray.killed_by_any"])].groupby("mutant.num_equivalence_claims")[
-    "mutant_id"
-].count()
+# Print number of killed / unkilled equivalent mutants
 
 
-# %% Number of unkilled mutants (LLM-generated tests + Pynguin tests) by num equiv claims
+@block
+def print_num_equivalent_mutants():
+    df = data[data["preset"] == PRESETS[0]]
+
+    # %% Number of mutants
+    print("all mutants", df["mutant_id"].count())
+
+    # %% Number flagged mutants
+    print("claimed mutants", df[(df["mutant.num_equivalence_claims"] > 0)]["mutant_id"].count())
+
+    # %% Number of unkilled flagged mutants (direct)
+    print(
+        "claimed and not killed in run",
+        df[(df["mutant.num_equivalence_claims"] > 0) & (df["mutant.num_kills"] == 0)]["mutant_id"].count(),
+    )
+
+    # %% Number of unkilled flagged mutants (cosmic_ray)
+    print(
+        "claimed and not killed with cosmic_ray",
+        df[(df["mutant.num_equivalence_claims"] > 0) & (~df["cosmic_ray_full.killed_by_any"])]["mutant_id"].count(),
+    )
+
+
+# %% Number of unkilled mutants (LLM-generated tests + Pynguin tests)
 
 data[
     (data["preset"] == PRESETS[0]) & (~data["cosmic_ray.killed_by_any"]) & (~data["pynguin.cosmic_ray.killed_by_any"])
-].groupby("mutant.num_equivalence_claims")["mutant_id"].count()
+]["mutant_id"].count()
 
 
 # %% Write stats about sampled mutants.
@@ -3698,6 +3770,7 @@ def plot_number_of_killed_and_unkilled_equivalences():
             continue
 
         group = plot_data.get_group(preset)
+        # don't use outcome for this
         claims_unkilled = group[(group["outcome"] == EQUIVALENT) & ~group["cosmic_ray_full.killed_by_any"]]
         claims_killed = group[(group["outcome"] == EQUIVALENT) & group["cosmic_ray_full.killed_by_any"]]
         num_killed.append(len(claims_killed))
@@ -3928,6 +4001,7 @@ def plot_killed_mutants_by_num_claims():
 #   LLM claims mutants that it struggles with => LLM struggles with the mutants it claimed
 
 
+@block
 def check_kill_rate_of_claimed_and_unclaimed_mutants():
     grouped_data = data.groupby("preset")
 
@@ -3936,8 +4010,8 @@ def check_kill_rate_of_claimed_and_unclaimed_mutants():
         group = group[~group["mutant_killed"]]
 
         print(preset)
-        claimed = group[group["claimed_equivalent"]]["pynguin.cosmic_ray_full.killed_by_any"]
-        not_claimed = group[~group["claimed_equivalent"]]["pynguin.cosmic_ray_full.killed_by_any"]
+        claimed = group[group["claimed_equivalent"]]["cosmic_ray_full.killed_by_any"]
+        not_claimed = group[~group["claimed_equivalent"]]["cosmic_ray_full.killed_by_any"]
         print(f"claimed equivalent: {claimed.sum():4d} killed, {len(claimed) - claimed.sum():4d} alive")
         print(f"       not claimed: {not_claimed.sum():4d} killed, {len(not_claimed) - not_claimed.sum():4d} alive")
         print(mannwhitneyu(claimed, not_claimed))
@@ -3950,3 +4024,223 @@ def check_kill_rate_of_claimed_and_unclaimed_mutants():
 # print(f"not claimed: {not_claimed.sum()} killed, {len(not_claimed) - not_claimed.sum()} alive")
 # print(mannwhitneyu(claimed, not_claimed))
 # print()
+
+
+# %% Print mean number of turns it takes to output a successful test
+
+
+@block
+def print_mean_num_turns_for_successful_test():
+    print(
+        "Baseline: Avg. number of turns for a successful test:",
+        data[(data["preset"] == "baseline_with_iterations") & (data["mutant_killed"])]["num_turns"].mean(),
+    )
+
+    print(
+        "Scientific: Avg. number of turns for a successful test:",
+        data[(data["preset"].isin(["debugging_one_shot", "debugging_zero_shot"])) & (data["mutant_killed"])][
+            "num_turns"
+        ].mean(),
+    )
+
+    print(data[data["mutant_killed"]].groupby("preset")["num_turns"].mean())
+
+
+# %% Plot equivalences per project
+
+
+@block
+@savefig
+def plot_equivalences_by_project():
+    grouped_data = data[data["preset"] == PRESETS[0]].groupby("project")
+
+    num_mutants_claimed_unkilled = []
+    num_mutants_claimed_killed = []
+
+    for project in PROJECTS:
+        group = grouped_data.get_group(project)
+        num_mutants_claimed_unkilled.append(
+            len(group[(group["mutant.num_equivalence_claims"] > 0) & (~group["cosmic_ray_full.killed_by_any"])])
+            / len(group)
+        )
+        num_mutants_claimed_killed.append(
+            len(group[(group["mutant.num_equivalence_claims"] > 0) & (group["cosmic_ray_full.killed_by_any"])])
+            / len(group)
+        )
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.bar(x=np.arange(len(PROJECTS)), height=num_mutants_claimed_killed, color=cmap_colors[0])
+    ax.bar(
+        x=np.arange(len(PROJECTS)),
+        bottom=num_mutants_claimed_killed,
+        height=num_mutants_claimed_unkilled,
+        color=cmap_colors[1],
+    )
+
+    ax.set_xticks(np.arange(len(PROJECTS)))
+    ax.set_xticklabels(PROJECTS, rotation=90)
+    ax.yaxis.set_major_formatter(format_perecent())
+    labels = ["Flagged mutants (killed)", "Flagged mutants (unkilled)"]
+    fig.legend(
+        labels,
+        loc="upper left",
+    )
+    ax.set_ylabel("Percentage of mutants")
+    # ax.set_ylim((0, 500))
+    return fig  # , list(zip(labels, [list(zip(PROJECTS, val)) for val in values]))
+
+
+# % All flagged mutants
+
+data[(data["preset"] == PRESETS[0]) & (data["mutant.num_equivalence_claims"] > 0)]["mutant_id"].count()
+
+
+# %% Flagged mutants not directly killed
+
+data[(data["preset"] == PRESETS[0]) & (data["mutant.num_equivalence_claims"] > 0) & (data["mutant.num_kills"] == 0)][
+    "mutant_id"
+].count()
+
+
+# %% Flagged mutants unkilled
+
+data[
+    (data["preset"] == PRESETS[0])
+    & (data["mutant.num_equivalence_claims"] > 0)
+    & (~data["cosmic_ray_full.killed_by_any"])
+]["mutant_id"].count()
+
+
+# %% Number of killed mutants by test
+
+most_failing_tests = {}
+
+# for index, row in data[(data["mutant.num_equivalence_claims"] > 0)].iterrows():
+for index, row in data.iterrows():
+    for test_id in row["cosmic_ray_full.failing_tests"]:
+        most_failing_tests[test_id] = most_failing_tests.get(test_id, 0) + 1
+
+for entry in sorted(list(most_failing_tests.items()), key=lambda x: x[1]):
+    print(entry)
+
+
+# %% Snakey diagram for flagged, killed and sampled mutants
+
+# Mutants killed in runs but not by cosmic-ray can be explained by flaky tests we had to exclude (and one ineffective test: 84783f0f).
+# Mutants killed by cosmic-ray but sampled can be explained by sampling the mutants with old cosmic-ray data.
+
+
+@block
+def samples_snakey():
+    plot_data = data[data["preset"] == PRESETS[0]]
+
+    cond_flagged = plot_data["mutant.num_equivalence_claims"] > 0
+    cond_directly_killed = plot_data["mutant.num_kills"] > 0
+    cond_cosmic_ray_killed = plot_data["cosmic_ray.killed_by_any"]
+    cond_sampled = plot_data["sampled"]
+    cond_equivalent = plot_data["sampled"] & plot_data["sample.equivalent"].fillna(False)
+
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                node=dict(
+                    pad=15,
+                    thickness=20,
+                    line=dict(color="black", width=0.5),
+                    label=[
+                        "Mutants flagged in a run",  # 0
+                        "Mutants not flagged in a run",  # 1
+                        "Mutants killed in a run",  # 2
+                        "Mutants not killed in a run",  # 3
+                        "Mutants killed by any LLM-generated test",  # 4
+                        "Mutants not killed by any LLM-generated test",  # 5
+                        "Sampled Mutants",  # 6
+                        "Equivalent by our definition",  # 7
+                        "Not equivalent by our definition",  # 8
+                    ],
+                    align="right",
+                ),
+                link=dict(
+                    source=[0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 6],
+                    target=[2, 3, 2, 3, 4, 5, 4, 5, 6, 6, 7, 8],
+                    value=[
+                        len(plot_data[cond_flagged & cond_directly_killed]),
+                        len(plot_data[cond_flagged & ~cond_directly_killed]),
+                        len(plot_data[~cond_flagged & cond_directly_killed]),
+                        len(plot_data[~cond_flagged & ~cond_directly_killed]),
+                        len(plot_data[cond_directly_killed & cond_cosmic_ray_killed]),
+                        len(plot_data[cond_directly_killed & ~cond_cosmic_ray_killed]),
+                        len(plot_data[~cond_directly_killed & cond_cosmic_ray_killed]),
+                        len(plot_data[~cond_directly_killed & ~cond_cosmic_ray_killed]),
+                        len(plot_data[cond_cosmic_ray_killed & cond_sampled]),
+                        len(plot_data[~cond_cosmic_ray_killed & cond_sampled]),
+                        len(plot_data[cond_sampled & cond_equivalent]),
+                        len(plot_data[cond_sampled & ~cond_equivalent]),
+                    ],
+                ),
+            )
+        ]
+    )
+
+    for line in [
+        f"len(plot_data),                                                   {len(plot_data)}",
+        f"len(plot_data[cond_flagged]),                                     {len(plot_data[cond_flagged])}",
+        f"len(plot_data[~cond_flagged]),                                    {len(plot_data[~cond_flagged])}",
+        f"len(plot_data[cond_directly_killed]),                             {len(plot_data[cond_directly_killed])}",
+        f"len(plot_data[~cond_directly_killed]),                            {len(plot_data[~cond_directly_killed])}",
+        f"len(plot_data[cond_cosmic_ray_killed]),                           {len(plot_data[cond_cosmic_ray_killed])}",
+        f"len(plot_data[~cond_cosmic_ray_killed]),                          {len(plot_data[~cond_cosmic_ray_killed])}",
+        f"len(plot_data[cond_sampled]),                                     {len(plot_data[cond_sampled])}",
+        f"len(plot_data[~cond_sampled]),                                    {len(plot_data[~cond_sampled])}",
+        f"len(plot_data[cond_equivalent]),                                  {len(plot_data[cond_equivalent])}",
+        f"len(plot_data[~cond_equivalent]),                                 {len(plot_data[~cond_equivalent])}",
+        f"len(plot_data[cond_flagged & cond_directly_killed]),              {len(plot_data[cond_flagged & cond_directly_killed])}",
+        f"len(plot_data[cond_flagged & ~cond_directly_killed]),             {len(plot_data[cond_flagged & ~cond_directly_killed])}",
+        f"len(plot_data[~cond_flagged & cond_directly_killed]),             {len(plot_data[~cond_flagged & cond_directly_killed])}",
+        f"len(plot_data[~cond_flagged & ~cond_directly_killed]),            {len(plot_data[~cond_flagged & ~cond_directly_killed])}",
+        f"len(plot_data[cond_directly_killed & cond_cosmic_ray_killed]),    {len(plot_data[cond_directly_killed & cond_cosmic_ray_killed])}",
+        f"len(plot_data[cond_directly_killed & ~cond_cosmic_ray_killed]),   {len(plot_data[cond_directly_killed & ~cond_cosmic_ray_killed])}",
+        f"len(plot_data[~cond_directly_killed & cond_cosmic_ray_killed]),   {len(plot_data[~cond_directly_killed & cond_cosmic_ray_killed])}",
+        f"len(plot_data[~cond_directly_killed & ~cond_cosmic_ray_killed]),  {len(plot_data[~cond_directly_killed & ~cond_cosmic_ray_killed])}",
+        f"len(plot_data[cond_cosmic_ray_killed & cond_sampled]),            {len(plot_data[cond_cosmic_ray_killed & cond_sampled])}",
+        f"len(plot_data[~cond_cosmic_ray_killed & cond_sampled]),           {len(plot_data[~cond_cosmic_ray_killed & cond_sampled])}",
+        f"len(plot_data[cond_sampled & cond_equivalent]),                   {len(plot_data[cond_sampled & cond_equivalent])}",
+        f"len(plot_data[cond_sampled & ~cond_equivalent]),                  {len(plot_data[cond_sampled & ~cond_equivalent])}",
+        "",
+        f"len(plot_data[cond_flagged & cond_cosmic_ray_killed]),    {len(plot_data[cond_flagged & cond_cosmic_ray_killed])}",
+        f"len(plot_data[cond_flagged & ~cond_cosmic_ray_killed]),   {len(plot_data[cond_flagged & ~cond_cosmic_ray_killed])}",
+        f"len(plot_data[~cond_flagged & cond_cosmic_ray_killed]),   {len(plot_data[~cond_flagged & cond_cosmic_ray_killed])}",
+        f"len(plot_data[~cond_flagged & ~cond_cosmic_ray_killed]),  {len(plot_data[~cond_flagged & ~cond_cosmic_ray_killed])}",
+    ]:
+        print(line)
+
+    fig.update_layout(title_text="Basic Sankey Diagram", font_size=10)
+    fig.write_html(OUTPUT_PATH / "snakey.html")
+
+
+# https://sankeymatic.com/build/
+
+# Mutants [2427] Flagged
+# Mutants [4953] Not Flagged
+# Flagged [1673] Killed
+# Flagged [754] Unkilled
+# Not Flagged [4675] Killed
+# Not Flagged [278] Unkilled
+# Killed [4] Sampled
+# Unkilled [161] Sampled
+# Sampled [29] Equivalent
+# Sampled [136] Not Equivalent
+
+
+# %% Mutants sampled but killed by cosmic ray
+
+# (Mutants were sampled with old cosmic-ray data)
+
+data[(data["preset"] == PRESETS[0]) & data["cosmic_ray_full.killed_by_any"] & data["sampled"]]["mutant_id"]
+
+
+# %% Mutants killed in a run but not killed by cosmic ray
+
+# (84783f0f was found to be an ineffective test, the others were all found to be flaky.)
+
+data[(data["mutant_killed"]) & ~data["cosmic_ray_full.killed_by_any"]]["long_id"]
