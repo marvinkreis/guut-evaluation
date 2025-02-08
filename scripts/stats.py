@@ -157,9 +157,12 @@ PACKAGE_TO_PROJECT = {
 SUCCESS = "success"
 EQUIVALENT = "equivalent"
 FAIL = "fail"
+EQUIVALENT_SUCCESS = "equivalent+success"
 
 OUTCOMES = [SUCCESS, EQUIVALENT, FAIL]
 OUTCOME_NAMES = ["Success", "Claimed Equivalent", "Failed"]
+FULL_OUTCOMES = [SUCCESS, EQUIVALENT_SUCCESS, EQUIVALENT, FAIL]
+FULL_OUTCOME_NAMES = ["Success", "Claimed Equivalent and Killed", "Claimed Equivalent", "Failed"]
 
 AGGS = ["mean", "median", "min", "max", "sum"]
 
@@ -427,6 +430,24 @@ def add_outcome_to_data():
             return FAIL
 
     data["outcome"] = data.apply(get_outcome, axis=1).to_frame(name="outcome")
+
+
+# %% Compute full outcome
+
+
+@block
+def add_full_outcome_to_data():
+    def get_full_outcome(row):
+        if row["mutant_killed"] and row["claimed_equivalent"]:
+            return EQUIVALENT_SUCCESS
+        if row["mutant_killed"]:
+            return SUCCESS
+        elif row["claimed_equivalent"]:
+            return EQUIVALENT
+        else:
+            return FAIL
+
+    data["full_outcome"] = data.apply(get_full_outcome, axis=1).to_frame(name="full_outcome")
 
 
 # %% Make preset easier to type
@@ -883,10 +904,10 @@ data["coverage.missing_lines"] = data["tests"].map(
     lambda tests: get_line_coverage_from_test(find_killing_test(tests))[1]
 )
 data["coverage.covered_line_ids"] = data.apply(
-    lambda row: [f'{row["problem.target_path"]}::{line}' for line in row["coverage.covered_lines"]], axis=1
+    lambda row: [f"{row['problem.target_path']}::{line}" for line in row["coverage.covered_lines"]], axis=1
 )
 data["coverage.missing_line_ids"] = data.apply(
-    lambda row: [f'{row["problem.target_path"]}::{line}' for line in row["coverage.missing_lines"]], axis=1
+    lambda row: [f"{row['problem.target_path']}::{line}" for line in row["coverage.missing_lines"]], axis=1
 )
 
 
@@ -908,10 +929,16 @@ data["coverage.missing_branches"] = data["tests"].map(
     lambda tests: get_branch_coverage_from_test(find_killing_test(tests))[1]
 )
 data["coverage.covered_branch_ids"] = data.apply(
-    lambda row: [f'{row["problem.target_path"]}::{branch}' for branch in row["coverage.covered_branches"]], axis=1
+    lambda row: [
+        f"{row['project']}::{row['problem.target_path']}::{branch}" for branch in row["coverage.covered_branches"]
+    ],
+    axis=1,
 )
 data["coverage.missing_branch_ids"] = data.apply(
-    lambda row: [f'{row["problem.target_path"]}::{branch}' for branch in row["coverage.missing_branches"]], axis=1
+    lambda row: [
+        f"{row['project']}::{row['problem.target_path']}::{branch}" for branch in row["coverage.missing_branches"]
+    ],
+    axis=1,
 )
 
 
@@ -1242,12 +1269,12 @@ def sample_mutants():
 
     for num_claims in [0, 1, 2, 3]:
         print(
-            f"{len(sampled_mutants[sampled_mutants["mutant.num_equivalence_claims"] == num_claims]):4d} mutants with {num_claims} claims"
+            f"{len(sampled_mutants[sampled_mutants['mutant.num_equivalence_claims'] == num_claims]):4d} mutants with {num_claims} claims"
         )
     print()
 
     for project in data["project"].unique():
-        print(f"{len(sampled_mutants[sampled_mutants["project"] == project]):4d} mutants from {project}")
+        print(f"{len(sampled_mutants[sampled_mutants['project'] == project]):4d} mutants from {project}")
     print()
 
     sampled_mutants_per_preset = {}
@@ -1638,9 +1665,9 @@ len(data[(data["num_experiment_import_errors"] + data["num_test_import_errors"])
 
 def print_num_runs_per_outcome(runs):
     print(f"  Total: {len(runs)}")
-    print(f"  Successful: {len(runs[runs["outcome"] == "success"])}")
-    print(f"  Equivalent: {len(runs[runs["outcome"] == "equivalent"])}")
-    print(f"  Failed: {len(runs[runs["outcome"] == "fail"])}")
+    print(f"  Successful: {len(runs[runs['outcome'] == 'success'])}")
+    print(f"  Equivalent: {len(runs[runs['outcome'] == 'equivalent'])}")
+    print(f"  Failed: {len(runs[runs['outcome'] == 'fail'])}")
 
 
 for preset in data["preset"].unique():
@@ -1710,32 +1737,32 @@ data[data["claimed_equivalent"]].sample(n=10, random_state=1)["long_id"]
 # %% Killed mutants
 
 
-print(f"Directly killed mutants: {len(data[data["mutant_killed"]])}")
-print(f"Mutants killed by tests from the same run: {len(data[data["cosmic_ray_full.killed_by_own"]])}")
-print(f"Mutants killed by tests from the any run: {len(data[data["cosmic_ray_full.killed_by_any"]])}")
+print(f"Directly killed mutants: {len(data[data['mutant_killed']])}")
+print(f"Mutants killed by tests from the same run: {len(data[data['cosmic_ray_full.killed_by_own']])}")
+print(f"Mutants killed by tests from the any run: {len(data[data['cosmic_ray_full.killed_by_any']])}")
 
 
 # %% Equivalent mutants
 
 
-print(f"Equivalence-claimed mutants: {len(data[data["claimed_equivalent"]])}")
+print(f"Equivalence-claimed mutants: {len(data[data['claimed_equivalent']])}")
 print(
-    f"Equivalence-claimed mutants not killed by test from same run: {len(data[data["claimed_equivalent"] & ~data["cosmic_ray_full.killed_by_own"]])}"
+    f"Equivalence-claimed mutants not killed by test from same run: {len(data[data['claimed_equivalent'] & ~data['cosmic_ray_full.killed_by_own']])}"
 )
 print(
-    f"Equivalence-claimed mutants not killed by test from any run: {len(data[data["claimed_equivalent"] & ~data["cosmic_ray_full.killed_by_any"]])}"
+    f"Equivalence-claimed mutants not killed by test from any run: {len(data[data['claimed_equivalent'] & ~data['cosmic_ray_full.killed_by_any']])}"
 )
 
 
 # %% Number of mutants with 0/1/2/3 claims
 
 
-print(f"mutants with {0} claims: {len(data[data["mutant.num_equivalence_claims"] == 0])//4:4d}")
-print(f"mutants with {1} claims: {len(data[data["mutant.num_equivalence_claims"] == 1])//4:4d}")
-print(f"mutants with {2} claims: {len(data[data["mutant.num_equivalence_claims"] == 2])//4:4d}")
-print(f"mutants with {3} claims: {len(data[data["mutant.num_equivalence_claims"] == 3])//4:4d}")
-print(f"mutants with {4} claims: {len(data[data["mutant.num_equivalence_claims"] == 4])//4:4d}")
-print(f"total number of claims: {len(data[data["claimed_equivalent"]])}")
+print(f"mutants with {0} claims: {len(data[data['mutant.num_equivalence_claims'] == 0]) // 4:4d}")
+print(f"mutants with {1} claims: {len(data[data['mutant.num_equivalence_claims'] == 1]) // 4:4d}")
+print(f"mutants with {2} claims: {len(data[data['mutant.num_equivalence_claims'] == 2]) // 4:4d}")
+print(f"mutants with {3} claims: {len(data[data['mutant.num_equivalence_claims'] == 3]) // 4:4d}")
+print(f"mutants with {4} claims: {len(data[data['mutant.num_equivalence_claims'] == 4]) // 4:4d}")
+print(f"total number of claims: {len(data[data['claimed_equivalent']])}")
 
 
 # %% Number of unkilled mutants with 1/2/3 claims per preset and project
@@ -1766,7 +1793,7 @@ for project in data["project"].unique():
         target_data[(target_data["outcome"] == EQUIVALENT) & ~target_data["cosmic_ray_full.killed_by_any"]],
     )
     print(
-        f"{project:<20} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 1]):3} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 2])//4:3} {len(claims_unkilled[claims_unkilled["mutant.num_equivalence_claims"] == 3])//4:3}"
+        f"{project:<20} {len(claims_unkilled[claims_unkilled['mutant.num_equivalence_claims'] == 1]):3} {len(claims_unkilled[claims_unkilled['mutant.num_equivalence_claims'] == 2]) // 4:3} {len(claims_unkilled[claims_unkilled['mutant.num_equivalence_claims'] == 3]) // 4:3}"
     )
 
 
@@ -1796,16 +1823,16 @@ data[data["cosmic_ray_full.killed_by_own"] != data["cosmic_ray_full.killed_by_ow
 target_data = data[data["preset"] == "debugging_one_shot"]
 for n in target_data["mutant.num_equivalence_claims"].unique():  # pyright: ignore
     print(
-        f"claims: {n}, equivalent: yes -> {len(target_data[target_data["sampled"] & (target_data["sample.equivalent"] == True) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+        f"claims: {n}, equivalent: yes -> {len(target_data[target_data['sampled'] & (target_data['sample.equivalent'] == True) & (target_data['mutant.num_equivalence_claims'] == n)])}"
     )
     print(
-        f"claims: {n}, equivalent: no -> {len(target_data[target_data["sampled"] & (target_data["sample.equivalent"] == False) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+        f"claims: {n}, equivalent: no -> {len(target_data[target_data['sampled'] & (target_data['sample.equivalent'] == False) & (target_data['mutant.num_equivalence_claims'] == n)])}"
     )
     print(
-        f"claims: {n}, equivalent: yes, unsure -> {len(target_data[target_data["sampled"] & target_data["sample.unsure"] & (target_data["sample.equivalent"] == True) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+        f"claims: {n}, equivalent: yes, unsure -> {len(target_data[target_data['sampled'] & target_data['sample.unsure'] & (target_data['sample.equivalent'] == True) & (target_data['mutant.num_equivalence_claims'] == n)])}"
     )
     print(
-        f"claims: {n}, equivalent: no, unsure -> {len(target_data[target_data["sampled"] & target_data["sample.unsure"] & (target_data["sample.equivalent"] == False) & (target_data["mutant.num_equivalence_claims"] == n)])}"
+        f"claims: {n}, equivalent: no, unsure -> {len(target_data[target_data['sampled'] & target_data['sample.unsure'] & (target_data['sample.equivalent'] == False) & (target_data['mutant.num_equivalence_claims'] == n)])}"
     )
 
 
@@ -1890,9 +1917,11 @@ def plot_violin_per_group(
         vp.set_edgecolor("black")
         vp.set_linewidth(1)
 
+    color = (cmap_colors[0][0] * 0.8, cmap_colors[0][1] * 0.8, cmap_colors[0][2] * 0.8)
+
     for vp in violin_parts["bodies"]:
-        vp.set_facecolor("red")
-        vp.set_edgecolor("red")
+        vp.set_facecolor(color)
+        vp.set_edgecolor(color)
         vp.set_linewidth(1)
         vp.set_alpha(0.4)
 
@@ -2349,7 +2378,7 @@ def plot_mean_cost_per_project_():
         axs[i].bar(x=np.arange(10), height=mean_costs[i])
         axs[i].set_xlim((-0.5, 9.5))
         axs[i].set_xticks(range(10))
-        axs[i].yaxis.set_major_formatter(lambda x, pos: f"{x*100:.1f}¢")
+        axs[i].yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.1f}¢")
         axs[3].set_yticks([0.00, 0.002, 0.004, 0.006, 0.008, 0.010])
     axs[3].set_xticklabels(projects, rotation=90)
 
@@ -2498,7 +2527,7 @@ def plot_mean_cost_per_project():
     ax.bar(x=x + 2, height=mean_costs[2], color=cmap_colors[2], width=1)
     ax.bar(x=x + 3, height=mean_costs[3], color=cmap_colors[3], width=1)
     ax.set_xlim((-2, 50))
-    ax.yaxis.set_major_formatter(lambda x, pos: f"{x*100:.1f}¢")
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.1f}¢")
 
     ax.set_xticks(x + 1.5)
     ax.set_xticklabels(PROJECTS, rotation=90)
@@ -2520,14 +2549,20 @@ def plot_num_tokens_per_mutant():
         for col in ["usage.cached_tokens", "usage.uncached_prompt_tokens", "usage.completion_tokens"]
     ]
 
+    colors = [
+        cmap_colors[1],
+        cmap_colors[0],
+        cmap_colors[2],
+    ]
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    handles = []
     for i in range(len(values)):
-        ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i])
+        handles.append(ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i], color=colors[i]))
 
     ax.set_xticks(np.arange(4))
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
-    fig.legend(labels, loc="upper left")
+    fig.legend(handles[::-1], labels[::-1], loc="upper left")
     ax.set_ylabel("Mean token usage per mutant")
 
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
@@ -2545,19 +2580,23 @@ def plot_cost_per_mutant():
         for col in ["usage.cost.cached_tokens", "usage.cost.uncached_prompt_tokens", "usage.cost.completion_tokens"]
     ]
 
-    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
-    for i in range(len(values)):
-        ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i])
+    colors = [
+        cmap_colors[1],
+        cmap_colors[0],
+        cmap_colors[2],
+    ]
 
-    ax.yaxis.set_major_formatter(lambda x, pos: f"{x*100:.1f}¢")
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    handles = []
+    for i in range(len(values)):
+        handles.append(ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i], color=colors[i]))
+
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.1f}¢")
     ax.set_xticks(np.arange(4))
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     ax.set_ylabel("Mean cost per mutant")
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
-    fig.legend(
-        labels,
-        loc="upper left",
-    )
+    fig.legend(handles[::-1], labels[::-1], loc="upper left")
 
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
@@ -2609,7 +2648,8 @@ class ____Success_Rate:  # mark this in the outline
 def plot_outcomes():
     grouped_data = data.groupby("preset")
     values = [
-        [(grouped_data.get_group(preset)["outcome"] == outcome).mean() for preset in PRESETS] for outcome in OUTCOMES
+        [(grouped_data.get_group(preset)["outcome"] == outcome).mean() for preset in PRESETS]
+        for outcome in [SUCCESS, EQUIVALENT, FAIL]
     ]
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
@@ -2624,6 +2664,41 @@ def plot_outcomes():
         labels,
         loc="upper left",
     )
+    ax.set_ylabel("Percentage of outcomes")
+    return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
+
+
+# %% Plot percentage of full outcomes
+
+
+@block
+@savefig
+def plot_full_outcomes():
+    grouped_data = data.groupby("preset")
+    values = [
+        [(grouped_data.get_group(preset)["full_outcome"] == outcome).mean() for preset in PRESETS]
+        for outcome in FULL_OUTCOMES
+    ]
+    print(values)
+    colors = [
+        cmap_colors[4],
+        cmap_colors[3],
+        cmap_colors[2],
+        cmap_colors[6],
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    handles = []
+    for i in range(len(values)):
+        handles.append(ax.bar(x=np.arange(4), bottom=np.sum(values[:i], axis=0), height=values[i], color=colors[i]))
+
+    ax.yaxis.set_major_formatter(format_perecent())
+    ax.set_xticks(np.arange(4))
+    ax.set_xticklabels(PRESET_NAMES, rotation=90)
+    labels = FULL_OUTCOME_NAMES
+
+    fig.legend(handles[::-1], labels[::-1], loc="upper left")
+
     ax.set_ylabel("Percentage of outcomes")
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
@@ -3191,7 +3266,7 @@ def plot_mutation_score_with_pynguin_distplot():
         killed_mutants = []
         for project in PROJECTS:
             group = grouped_data.get_group((preset, project))
-            killed_mutants.append(group["cosmic_ray.killed_by_own"].sum() / len(group))
+            killed_mutants.append(group["cosmic_ray_full.killed_by_own"].sum() / len(group))
         values.append(killed_mutants)
 
     # Pynguin combined runs
@@ -3725,18 +3800,26 @@ def print_num_equivalent_mutants():
         df[(df["mutant.num_equivalence_claims"] > 0) & (df["mutant.num_kills"] == 0)]["mutant_id"].count(),
     )
 
-    # %% Number of unkilled flagged mutants (cosmic_ray)
+    # %% Number of unkilled flagged mutants (direct + cosmic_ray)
     print(
-        "claimed and not killed with cosmic_ray",
-        df[(df["mutant.num_equivalence_claims"] > 0) & (~df["cosmic_ray_full.killed_by_any"])]["mutant_id"].count(),
+        "claimed and not killed in run or with cosmic_ray",
+        df[
+            (df["mutant.num_equivalence_claims"] > 0)
+            & (df["mutant.num_kills"] == 0)
+            & (~df["cosmic_ray_full.killed_by_any"])
+        ]["mutant_id"].count(),
     )
 
-
-# %% Number of unkilled mutants (LLM-generated tests + Pynguin tests)
-
-data[
-    (data["preset"] == PRESETS[0]) & (~data["cosmic_ray.killed_by_any"]) & (~data["pynguin.cosmic_ray.killed_by_any"])
-]["mutant_id"].count()
+    # %% Number of unkilled mutants (LLM-generated tests + Pynguin tests)
+    print(
+        "claimed and not killed in run or with cosmic-ray or with Pynguin cosmic-ray",
+        df[
+            (df["mutant.num_equivalence_claims"] > 0)
+            & (df["mutant.num_kills"] == 0)
+            & (~df["cosmic_ray_full.killed_by_any"])
+            & (~df["pynguin.cosmic_ray.killed_by_any"])
+        ]["mutant_id"].count(),
+    )
 
 
 # %% Write stats about sampled mutants.
@@ -3822,23 +3905,6 @@ raw_pynguin_data[(~raw_pynguin_data["Excluded"]) & (raw_pynguin_data["Project"].
 # %% Minimize test suites
 
 
-def minimize_test_suite_by_ms_old(df):
-    selected_tests = set()
-
-    for index, row in df.iterrows():
-        failing_tests = row["cosmic_ray_full.failing_tests"]
-
-        if not selected_tests.isdisjoint(failing_tests):
-            continue
-
-        for test_id in failing_tests:
-            if test_id not in selected_tests:
-                selected_tests.add(test_id)
-                break
-
-    return selected_tests
-
-
 def minimize_test_suite_by_ms(df):
     kills_per_test = get_kills_per_test(df)
     tests_with_kills = list(kills_per_test.items())
@@ -3866,7 +3932,7 @@ def minimize_test_suite_by_line_coverage(df):
         if seen_covered_lines.issuperset(covered_lines):
             continue
 
-        selected_tests.add(row["long_id"])
+        selected_tests.add(row["escaped_long_id"])
         seen_covered_lines.update(covered_lines)
 
     return selected_tests
@@ -3882,7 +3948,7 @@ def minimize_test_suite_by_branch_coverage(df):
         if seen_covered_lines.issuperset(covered_lines):
             continue
 
-        selected_tests.add(row["long_id"])
+        selected_tests.add(row["escaped_long_id"])
         seen_covered_lines.update(covered_lines)
 
     return selected_tests
@@ -3900,6 +3966,10 @@ def get_kills(group, suite):
 
 @block
 def minimize_test_suites():
+    """
+    IMPORTANT: This excludes killed mutants that were only killed by timeout (202 mutants).
+    """
+
     grouped_data = data.groupby("preset")
 
     for preset in PRESETS:
@@ -3908,36 +3978,38 @@ def minimize_test_suites():
         group = grouped_data.get_group(preset)
 
         large_suite = set(group[group["mutant_killed"]]["escaped_long_id"])
-        minimized_suite = minimize_test_suite_by_ms(group)
-
-        # print(len(large_suite))
-        # print(len(minimized_suite))
-        # print(len(large_suite.intersection(minimized_suite)))
+        minimized_suite_by_ms = minimize_test_suite_by_ms(group)
+        minimized_suite_by_line_coverage = minimize_test_suite_by_line_coverage(group)
+        minimized_suite_by_branch_coverage = minimize_test_suite_by_branch_coverage(group)
 
         print(f"unminimized test files: {len(large_suite)}")
-        print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
         print(f"unminimized kills: {len(get_kills(group, large_suite))}")
+        # print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
 
-        print(f"minimized by MS test files: {len(minimized_suite)}")
-        print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
-        print(f"minimized by MS kills: {len(get_kills(group, minimized_suite))}")
+        print(f"minimized by MS test files: {len(minimized_suite_by_ms)}")
+        print(f"minimized by MS kills: {len(get_kills(group, minimized_suite_by_ms))}")
+        # print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
 
-        # print(f"minimized by line coverage: {minimize_test_suite_by_line_coverage(group)}")
-        # print(f"minimized by branch coverage: {minimize_test_suite_by_branch_coverage(group)}")
+        print(f"minimized by branch coverage test files: {len(minimized_suite_by_branch_coverage)}")
+        print(f"minimized by branch coverage kills: {len(get_kills(group, minimized_suite_by_branch_coverage))}")
 
-    print("\nall presets")
-    large_suite = set(data[data["mutant_killed"]]["escaped_long_id"])
-    minimized_suite = minimize_test_suite_by_ms(data)
+        print(f"minimized by line coverage test files: {len(minimized_suite_by_line_coverage)}")
+        print(f"minimized by line coverage kills: {len(get_kills(group, minimized_suite_by_line_coverage))}")
 
-    print(f"unminimized test files: {len(large_suite)}")
-    print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
-    print(f"unminimized kills: {len(get_kills(data, large_suite))}")
+    # print("\nall presets")
+    # large_suite = set(data[data["mutant_killed"]]["escaped_long_id"])
+    # minimized_suite = minimize_test_suite_by_ms(data)
 
-    print(f"minimized by MS test files: {len(minimized_suite)}")
-    print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
-    print(f"minimized by MS kills: {len(get_kills(data, minimized_suite))}")
+    # print(f"unminimized test files: {len(large_suite)}")
+    # print(f"unminimized kills: {len(get_kills(data, large_suite))}")
+    # # print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
 
-    print(f"\nall killed mutants: {data[data["preset"] == PRESETS[0]]["cosmic_ray_full.killed_by_any"].sum()}")
+    # print(f"minimized by MS test files: {len(minimized_suite)}")
+    # print(f"minimized by MS kills: {len(get_kills(data, minimized_suite))}")
+    # # print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
+
+    # # This shows more killed mutants as it also includes mutants killed by timeout.
+    # print(f"\nall killed mutants: {data[data['preset'] == PRESETS[0]]['cosmic_ray_full.killed_by_any'].sum()}")
 
 
 # %% Plot killed mutants by number of claims
@@ -4136,7 +4208,7 @@ def samples_snakey():
 
     cond_flagged = plot_data["mutant.num_equivalence_claims"] > 0
     cond_directly_killed = plot_data["mutant.num_kills"] > 0
-    cond_cosmic_ray_killed = plot_data["cosmic_ray.killed_by_any"]
+    cond_cosmic_ray_killed = plot_data["cosmic_ray_full.killed_by_any"]
     cond_sampled = plot_data["sampled"]
     cond_equivalent = plot_data["sampled"] & plot_data["sample.equivalent"].fillna(False)
 
@@ -4194,6 +4266,7 @@ def samples_snakey():
         f"len(plot_data[~cond_sampled]),                                    {len(plot_data[~cond_sampled])}",
         f"len(plot_data[cond_equivalent]),                                  {len(plot_data[cond_equivalent])}",
         f"len(plot_data[~cond_equivalent]),                                 {len(plot_data[~cond_equivalent])}",
+        "",
         f"len(plot_data[cond_flagged & cond_directly_killed]),              {len(plot_data[cond_flagged & cond_directly_killed])}",
         f"len(plot_data[cond_flagged & ~cond_directly_killed]),             {len(plot_data[cond_flagged & ~cond_directly_killed])}",
         f"len(plot_data[~cond_flagged & cond_directly_killed]),             {len(plot_data[~cond_flagged & cond_directly_killed])}",
@@ -4211,6 +4284,8 @@ def samples_snakey():
         f"len(plot_data[cond_flagged & ~cond_cosmic_ray_killed]),   {len(plot_data[cond_flagged & ~cond_cosmic_ray_killed])}",
         f"len(plot_data[~cond_flagged & cond_cosmic_ray_killed]),   {len(plot_data[~cond_flagged & cond_cosmic_ray_killed])}",
         f"len(plot_data[~cond_flagged & ~cond_cosmic_ray_killed]),  {len(plot_data[~cond_flagged & ~cond_cosmic_ray_killed])}",
+        "",
+        f"len(plot_data[cond_flagged & ~cond_directly_killed & ~cond_cosmic_ray_killed)]),   {len(plot_data[cond_flagged & ~cond_directly_killed & ~cond_cosmic_ray_killed])}",
     ]:
         print(line)
 
@@ -4244,3 +4319,8 @@ data[(data["preset"] == PRESETS[0]) & data["cosmic_ray_full.killed_by_any"] & da
 # (84783f0f was found to be an ineffective test, the others were all found to be flaky.)
 
 data[(data["mutant_killed"]) & ~data["cosmic_ray_full.killed_by_any"]]["long_id"]
+
+
+# %%
+
+len(data[data["mutant_killed"] & data["claimed_equivalent"]])
