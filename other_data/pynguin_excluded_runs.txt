@@ -1,0 +1,31 @@
+- flutils/06: Tests delete the package under test.
+- flutils/09: Tests delete the package under test.
+- flake8/04: Tests cause pytest to raise an OSError. Most mutants are killed even though the tests pass.
+- apimd/24: Missing in the results.
+- pdir2: Breaks Pynguin, because pdir2 replaces its own module with a function.
+
+
+Test suites that fail coverage measurement:
+- flutils/10, flutils/20
+    INTERNALERROR> Traceback (most recent call last):
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/_pytest/main.py", line 283, in wrap_session
+    INTERNALERROR>     session.exitstatus = doit(config, session) or 0
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/_pytest/main.py", line 337, in _main
+    INTERNALERROR>     config.hook.pytest_runtestloop(session=session)
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/pluggy/_hooks.py", line 513, in __call__
+    INTERNALERROR>     return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    INTERNALERROR>     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/pluggy/_callers.py", line 156, in _multicall
+    INTERNALERROR>     teardown[0].send(outcome)
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/pytest_cov/plugin.py", line 329, in pytest_runtestloop
+    INTERNALERROR>     self.cov_controller.finish()
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/pytest_cov/engine.py", line 54, in ensure_topdir_wrapper
+    INTERNALERROR>     return meth(self, *args, **kwargs)
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/pytest_cov/engine.py", line 274, in finish
+    INTERNALERROR>     self.cov.stop()
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/coverage/control.py", line 668, in stop
+    INTERNALERROR>     self._collector.stop()
+    INTERNALERROR>   File "/emse_projects/pynguin_venvs/flutils/lib/python3.10/site-packages/coverage/collector.py", line 348, in stop
+    INTERNALERROR>     assert self._collectors
+    INTERNALERROR> AssertionError
