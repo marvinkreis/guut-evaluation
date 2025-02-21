@@ -48,15 +48,17 @@
 # ======================================================================================================================
 
 import ast
+import itertools
 import json
 import os
 import sqlite3
 import math
 import re
+import subprocess
 from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, Callable
+from typing import Any, Dict, Iterable, List, Literal, NamedTuple, Tuple, cast, Callable, Set
 from scipy.stats import mannwhitneyu
 from collections import defaultdict
 
@@ -67,6 +69,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import colormaps as cm
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from tqdm import tqdm
 
 pd.set_option("display.width", None)
@@ -79,6 +82,7 @@ type JsonObj = Dict[str, Any]
 OUTPUT_PATH = Path("/tmp/out")
 OUTPUT_PATH.mkdir(exist_ok=True)
 
+subprocess
 
 # %% Find result directories
 
@@ -110,6 +114,13 @@ PRESET_NAMES = [
     "Iterative",
     "Scientific (0-shot)",
     "Scientific (1-shot)",
+]
+
+PRESET_NAMES_COMPACT = [
+    "Baseline",
+    "Iterative",
+    "Scientific\n(0-shot)",
+    "Scientific\n(1-shot)",
 ]
 
 PROJECTS = [
@@ -255,6 +266,13 @@ def get_num_pynguin_runs_per_project(project: str):
         return 30 - 1
     else:
         return 30
+
+
+# %% Flatten
+
+
+def flatten(xss):
+    return [x for xs in xss for x in xs]
 
 
 # %% Parse info from the results directory name
@@ -701,6 +719,16 @@ def get_kills_per_test(df):
     kills_per_test = defaultdict(set)
     for index, row in df.iterrows():
         failing_tests = row["cosmic_ray_full.failing_tests"]
+        mutant_id = row["mutant_id"]
+        for test_id in failing_tests:
+            kills_per_test[test_id].add(mutant_id)
+    return kills_per_test
+
+
+def get_pynguin_kills_per_test(df):
+    kills_per_test = defaultdict(set)
+    for index, row in df.iterrows():
+        failing_tests = row["failing_tests"]
         mutant_id = row["mutant_id"]
         for test_id in failing_tests:
             kills_per_test[test_id].add(mutant_id)
@@ -1172,13 +1200,27 @@ data["num_incomplete_responses"] = data["conversation"].map(
 # %% Estimate test LOC
 
 
-def estimate_loc(test):
-    if test is None:
-        return None
-    return len([line for line in test["code"].splitlines() if line.strip() and not line.strip().startswith("#")])
+# def estimate_loc(test):
+#     if test is None:
+#         return None
+#     return len([line for line in test["code"].splitlines() if line.strip() and not line.strip().startswith("#")])
 
 
-data["test_loc"] = data["tests"].map(lambda tests: estimate_loc(find_killing_test(tests)))
+# data["test_loc"] = data["tests"].map(lambda tests: estimate_loc(find_killing_test(tests)))
+
+
+# %% Load test LOC
+
+
+loc_per_test = json.loads((REPO_PATH / "other_data" / "guut_loc_per_test.json").read_text())
+
+# %% Pynguin LOC
+
+
+pynguin_loc_per_test = json.loads((REPO_PATH / "other_data" / "pynguin_loc_per_test.json").read_text())
+pynguin_minimized_loc_per_test = json.loads(
+    (REPO_PATH / "other_data" / "pynguin_minimized_loc_per_test.json").read_text()
+)
 
 
 # %% Count import errors
@@ -2562,7 +2604,7 @@ def plot_num_tokens_per_mutant():
     ax.set_xticks(np.arange(4))
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
-    fig.legend(handles[::-1], labels[::-1], loc="upper left")
+    fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(0.0, 0.1))
     ax.set_ylabel("Mean token usage per mutant")
 
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
@@ -2596,7 +2638,7 @@ def plot_cost_per_mutant():
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     ax.set_ylabel("Mean cost per mutant")
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
-    fig.legend(handles[::-1], labels[::-1], loc="upper left")
+    fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(0.0, 0.1))
 
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
 
@@ -2697,7 +2739,7 @@ def plot_full_outcomes():
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     labels = FULL_OUTCOME_NAMES
 
-    fig.legend(handles[::-1], labels[::-1], loc="upper left")
+    fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(-0.05, 0.1))
 
     ax.set_ylabel("Percentage of outcomes")
     return fig, list(zip(labels, [list(zip(PRESET_NAMES, val)) for val in values]))
@@ -3511,6 +3553,48 @@ def plot_number_of_test_cases_distplot():
     return fig, list(zip(labels, values))
 
 
+# %% Plot mean number of tests per mutant with Pynguin
+
+
+@block
+@savefig
+def plot_loc_distplot():
+    grouped_data = data.groupby(["preset", "project"])
+
+    values = []
+    for preset in PRESETS:
+        num_loc_per_project = []
+
+        for project in PROJECTS:
+            group = grouped_data.get_group((preset, project))
+            num_loc_per_project.append(sum([loc_per_test.get(id + ".py") or 0 for id in group["escaped_long_id"]]))
+
+        values.append([int(n) for n in num_loc_per_project])
+
+    pynguin_values = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            project_loc = 0
+            for key, loc in pynguin_loc_per_test.items():
+                if key.startswith(f"{index}::{project}"):
+                    project_loc += loc
+
+            pynguin_values.append(project_loc)
+    values.append(pynguin_values)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    labels = PRESET_NAMES + ["Pynguin (individual)"]
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(labels, rotation=90)
+    ax.set_ylabel("Number of tests")
+    distribution_plot(values, ax=ax)
+
+    return fig, list(zip(labels, values))
+
+
 # %% Mann Whitney U test with the number of tests
 
 
@@ -3902,6 +3986,14 @@ raw_pynguin_data[(~raw_pynguin_data["Excluded"]) & (raw_pynguin_data["Project"].
 )["TotalCost"].sum().groupby("Project").mean()
 
 
+# %% Test Suite Minimization
+# ======================================================================================================================
+
+
+class ____Test_Suite_Minimization:  # mark this in the outline
+    pass
+
+
 # %% Minimize test suites
 
 
@@ -3911,45 +4003,64 @@ def minimize_test_suite_by_ms(df):
     tests_with_kills = sorted(tests_with_kills, key=lambda x: len(x[1]), reverse=True)
 
     selected_tests = set()
-    killed_mutants = set()
+    seen_killed_mutants = set()
     for test, kills in tests_with_kills:
-        if kills.issubset(killed_mutants):
+        if kills.issubset(seen_killed_mutants):
             continue
 
         selected_tests.add(test)
-        killed_mutants.update(kills)
+        seen_killed_mutants.update(kills)
+
+    return selected_tests
+
+
+def minimize_pynguin_test_suite_by_ms(df):
+    kills_per_test = get_pynguin_kills_per_test(df)
+    tests_with_kills = list(kills_per_test.items())
+    tests_with_kills = sorted(tests_with_kills, key=lambda x: len(x[1]), reverse=True)
+
+    selected_tests = set()
+    seen_killed_mutants = set()
+    for test, kills in tests_with_kills:
+        if kills.issubset(seen_killed_mutants):
+            continue
+
+        selected_tests.add(test)
+        seen_killed_mutants.update(kills)
 
     return selected_tests
 
 
 def minimize_test_suite_by_line_coverage(df):
+    tests_with_coverage = [(row["escaped_long_id"], set(row["coverage.covered_line_ids"])) for _, row in df.iterrows()]
+    tests_with_coverage = sorted(tests_with_coverage, key=lambda x: len(x[1]), reverse=True)
+
     selected_tests = set()
     seen_covered_lines = set()
-
-    for index, row in df.iterrows():
-        covered_lines = row["coverage.covered_line_ids"]
-
-        if seen_covered_lines.issuperset(covered_lines):
+    for test, covered_lines in tests_with_coverage:
+        if covered_lines.issubset(seen_covered_lines):
             continue
 
-        selected_tests.add(row["escaped_long_id"])
+        selected_tests.add(test)
         seen_covered_lines.update(covered_lines)
 
     return selected_tests
 
 
 def minimize_test_suite_by_branch_coverage(df):
+    tests_with_coverage = [
+        (row["escaped_long_id"], set(row["coverage.covered_branch_ids"])) for _, row in df.iterrows()
+    ]
+    tests_with_coverage = sorted(tests_with_coverage, key=lambda x: len(x[1]), reverse=True)
+
     selected_tests = set()
-    seen_covered_lines = set()
-
-    for index, row in df.iterrows():
-        covered_lines = row["coverage.covered_branch_ids"]
-
-        if seen_covered_lines.issuperset(covered_lines):
+    seen_covered_branches = set()
+    for test, covered_branches in tests_with_coverage:
+        if covered_branches.issubset(seen_covered_branches):
             continue
 
-        selected_tests.add(row["escaped_long_id"])
-        seen_covered_lines.update(covered_lines)
+        selected_tests.add(test)
+        seen_covered_branches.update(covered_branches)
 
     return selected_tests
 
@@ -3964,52 +4075,330 @@ def get_kills(group, suite):
     return killed_mutants
 
 
-@block
-def minimize_test_suites():
-    """
-    IMPORTANT: This excludes killed mutants that were only killed by timeout (202 mutants).
-    """
+class TestSuiteWithKills(NamedTuple):
+    tests: Set[str]
+    kills: Set[MutantId]
 
+
+class MinimizedTestSuites(NamedTuple):
+    tests_unminimized: TestSuiteWithKills
+    tests_minimized_by_mutation_score: TestSuiteWithKills
+    tests_minimized_by_branch_coverage: TestSuiteWithKills | None
+    tests_minimized_by_line_coverage: TestSuiteWithKills | None
+
+
+def minimize_test_suites():
+    minimized_suites = {}
+
+    for preset, project in itertools.product(PRESETS, PROJECTS):
+        group = data[(data["preset"] == preset) & (data["project"] == project)]
+
+        large_suite = set(group[group["mutant_killed"]]["escaped_long_id"])
+        large_suite_kills = get_kills(group, large_suite)
+
+        minimized_suite_by_ms = minimize_test_suite_by_ms(group)
+        minimized_suite_by_ms_kills = get_kills(group, minimized_suite_by_ms)
+
+        minimized_suite_by_line_coverage = minimize_test_suite_by_line_coverage(group)
+        minimized_suite_by_line_coverage_kills = get_kills(group, minimized_suite_by_line_coverage)
+
+        minimized_suite_by_branch_coverage = minimize_test_suite_by_branch_coverage(group)
+        minimized_suite_by_branch_coverage_kills = get_kills(group, minimized_suite_by_branch_coverage)
+
+        minimized_suites[(preset, project)] = MinimizedTestSuites(
+            TestSuiteWithKills(large_suite, large_suite_kills),
+            TestSuiteWithKills(minimized_suite_by_ms, minimized_suite_by_ms_kills),
+            TestSuiteWithKills(minimized_suite_by_line_coverage, minimized_suite_by_line_coverage_kills),
+            TestSuiteWithKills(minimized_suite_by_branch_coverage, minimized_suite_by_branch_coverage_kills),
+        )
+
+        print(f"\n{preset} / {project}")
+        print(f"unminimized test files: {len(large_suite)}")
+        print(f"unminimized kills: {len(large_suite_kills)}")
+        # print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
+        print(f"minimized by MS test files: {len(minimized_suite_by_ms)}")
+        print(f"minimized by MS kills: {len(minimized_suite_by_ms_kills)}")
+        # print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
+        print(f"minimized by branch coverage test files: {len(minimized_suite_by_branch_coverage)}")
+        print(f"minimized by branch coverage kills: {len(minimized_suite_by_branch_coverage_kills)}")
+        print(f"minimized by line coverage test files: {len(minimized_suite_by_line_coverage)}")
+        print(f"minimized by line coverage kills: {len(minimized_suite_by_line_coverage_kills)}")
+
+    return minimized_suites
+
+
+minimized_test_suites = minimize_test_suites()
+
+# %% Minimize Pynguin Test Suites
+
+
+def get_pynguin_kills(group, suite):
+    kills_per_test = get_pynguin_kills_per_test(group)
+    killed_mutants = set()
+
+    for test in suite:
+        killed_mutants.update(kills_per_test[test])
+
+    return killed_mutants
+
+
+def minimize_pynguin_test_suites():
+    minimized_suites = {}
+
+    for project, index in itertools.product(PROJECTS, list(range(1, 31))):
+        if is_pynguin_run_excluded(project, index):
+            continue
+
+        group = pynguin_data[(pynguin_data["project"] == project) & (pynguin_data["index"] == index)]
+
+        large_suite = set(flatten(group["failing_tests"]))
+        large_suite_kills = get_pynguin_kills(group, large_suite)
+
+        minimized_suite_by_ms = minimize_pynguin_test_suite_by_ms(group)
+        minimized_suite_by_ms_kills = get_pynguin_kills(group, minimized_suite_by_ms)
+
+        minimized_suites[(project, index)] = MinimizedTestSuites(
+            TestSuiteWithKills(large_suite, large_suite_kills),
+            TestSuiteWithKills(minimized_suite_by_ms, minimized_suite_by_ms_kills),
+            None,
+            None,
+        )
+
+        print(f"\n{project} / {index}")
+        print(f"unminimized test cases: {len(large_suite)}")
+        print(f"unminimized kills: {len(large_suite_kills)}")
+        # print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
+        print(f"minimized by MS test cases: {len(minimized_suite_by_ms)}")
+        print(f"minimized by MS kills: {len(minimized_suite_by_ms_kills)}")
+        # print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
+
+    return minimized_suites
+
+
+minimized_pynguin_test_suites = minimize_pynguin_test_suites()
+
+
+# %% Plot number of tests cases in minimized test suites
+
+
+@block
+@savefig
+def plot_number_of_minimized_test_cases_distplot():
+    values = []
+    labels = []
+
+    # Minimized test suites
+    for preset, name in zip(PRESETS, PRESET_NAMES):
+        labels.append(name)
+        values.append(
+            [
+                sum(
+                    [
+                        num_cases_per_test[t]
+                        for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
+                    ]
+                )
+                for project in PROJECTS
+            ]
+        )
+
+    labels.append("Pynguin (individual)")
+    values.append([len(s.tests_minimized_by_mutation_score.tests) for s in minimized_pynguin_test_suites.values()])
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(labels, rotation=90)
+    ax.set_ylabel("Number of tests")
+    distribution_plot(values, ax=ax)
+
+    return fig, list(zip(labels, values))
+
+
+# %% Plot LOC in minimized test suites
+
+
+@block
+@savefig
+def plot_loc_of_minimized_test_suites_distplot():
+    values = []
+    labels = []
+
+    # Minimized test suites
+    for preset, name in zip(PRESETS, PRESET_NAMES):
+        labels.append(name)
+        values.append(
+            [
+                sum(
+                    [
+                        loc_per_test[t + ".py"]
+                        for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
+                    ]
+                )
+                for project in PROJECTS
+            ]
+        )
+
+    labels.append("Pynguin (individual)")
+    pynguin_values = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            project_loc = 0
+            for key, loc in pynguin_minimized_loc_per_test.items():
+                if key.startswith(f"{index}::{project}"):
+                    project_loc += loc
+
+            pynguin_values.append(project_loc)
+    values.append(pynguin_values)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
+    ax.set_xticks(np.arange(len(values)))
+    ax.set_xticklabels(labels, rotation=90)
+    ax.set_ylabel("Number of tests")
+    distribution_plot(values, ax=ax)
+
+    return fig, list(zip(labels, values))
+
+
+# %% Number of Iterations
+# ======================================================================================================================
+
+
+class ____Number_of_Iterations:  # mark this in the outline
+    pass
+
+
+stats_per_iteration_limit = {}
+
+
+class Usage(NamedTuple):
+    cached_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+
+
+class IterationLimitInfo(NamedTuple):
+    iterations: int
+    successful_runs: List[MutantId]
+    kills: Set[MutantId]
+    usages: List[Usage]
+
+
+def get_usage_for_n_iterations(conversation, n) -> Usage:
+    cached_tokens = 0
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    i = 0
+    for msg in conversation:
+        if not msg.get("usage"):
+            continue
+
+        cached_tokens += msg["usage"].get("cached_tokens", 0)
+        prompt_tokens += msg["usage"]["prompt_tokens"]
+        completion_tokens += msg["usage"]["completion_tokens"]
+
+        if msg["tag"] in ["experiment_stated", "test_stated"]:
+            i += 1
+            if i == n:
+                break
+
+    return Usage(
+        cached_tokens,
+        prompt_tokens,
+        completion_tokens,
+        (prompt_tokens - cached_tokens) * 0.150 / 1_000_000
+        + cached_tokens * 0.075 / 1_000_000
+        + completion_tokens * 0.600 / 1_000_000,
+    )
+
+
+def get_total_usages_for_n_iterations(group, n) -> List[Usage]:
+    return list(group["conversation"].map(lambda c: get_usage_for_n_iterations(c, n)))
+
+
+@block
+def calculate_number_of_kills_per_iteration_limit():
     grouped_data = data.groupby("preset")
 
     for preset in PRESETS:
         print(f"\n{preset}")
-
         group = grouped_data.get_group(preset)
+        values = []
 
-        large_suite = set(group[group["mutant_killed"]]["escaped_long_id"])
-        minimized_suite_by_ms = minimize_test_suite_by_ms(group)
-        minimized_suite_by_line_coverage = minimize_test_suite_by_line_coverage(group)
-        minimized_suite_by_branch_coverage = minimize_test_suite_by_branch_coverage(group)
+        for num_turns in range(1, 11):
+            group_killed = group[group["mutant_killed"] & (group["num_turns"] <= num_turns)]
+            successful_runs = list(group_killed["mutant_id"])
+            kills = get_kills(group_killed, group_killed["escaped_long_id"])
+            usages = get_total_usages_for_n_iterations(group, num_turns)
+            # if we ignore the successful runs, we get exponential growth
+            # seems like the fact that some runs end at each iteration counteract this
+            # usages = get_total_usages_for_n_iterations(group[~group["mutant_killed"]], num_turns)
+            print(f"number of test files for {num_turns} its: {len(successful_runs)}")
+            print(f"number killed mutants for {num_turns} its: {len(kills)}")
+            print(f"cost for {num_turns} its: {sum([u.cost for u in usages])}")
+            values.append(IterationLimitInfo(num_turns, successful_runs, kills, usages))
 
-        print(f"unminimized test files: {len(large_suite)}")
-        print(f"unminimized kills: {len(get_kills(group, large_suite))}")
-        # print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
+        stats_per_iteration_limit[preset] = values
 
-        print(f"minimized by MS test files: {len(minimized_suite_by_ms)}")
-        print(f"minimized by MS kills: {len(get_kills(group, minimized_suite_by_ms))}")
-        # print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
 
-        print(f"minimized by branch coverage test files: {len(minimized_suite_by_branch_coverage)}")
-        print(f"minimized by branch coverage kills: {len(get_kills(group, minimized_suite_by_branch_coverage))}")
+# %% Plot Number of Iterations
 
-        print(f"minimized by line coverage test files: {len(minimized_suite_by_line_coverage)}")
-        print(f"minimized by line coverage kills: {len(get_kills(group, minimized_suite_by_line_coverage))}")
 
-    # print("\nall presets")
-    # large_suite = set(data[data["mutant_killed"]]["escaped_long_id"])
-    # minimized_suite = minimize_test_suite_by_ms(data)
+@block
+@savefig
+def plot_number_of_kills_per_iteration_limit():
+    fig, ax = plt.subplots(layout="constrained", figsize=(6, 4))
+    ax.set_xlim(1, 10)
+    ax2 = ax.twinx()
 
-    # print(f"unminimized test files: {len(large_suite)}")
-    # print(f"unminimized kills: {len(get_kills(data, large_suite))}")
-    # # print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
+    for preset, name, color in zip(PRESETS[1:], PRESET_NAMES[1:], cmap_colors[::2]):
+        info = stats_per_iteration_limit[preset]
 
-    # print(f"minimized by MS test files: {len(minimized_suite)}")
-    # print(f"minimized by MS kills: {len(get_kills(data, minimized_suite))}")
-    # # print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
+        ax.plot([i.iterations for i in info], [len(i.kills) for i in info], label=f"{name}", color=color, linewidth=2)
+        ax2.plot(
+            [i.iterations for i in info],
+            [sum([u.cost for u in i.usages]) for i in info],
+            "--",
+            label=f"{name}",
+            color=color,
+            linewidth=2,
+        )
 
-    # # This shows more killed mutants as it also includes mutants killed by timeout.
-    # print(f"\nall killed mutants: {data[data['preset'] == PRESETS[0]]['cosmic_ray_full.killed_by_any'].sum()}")
+    handles, labels = ax.get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(
+        handles + [Line2D([], [], linestyle="--", color="gray", linewidth=2)],
+        labels + ["Cost in US-$"],
+    )
+    ax.set_ylabel("Number of killed mutants")
+    ax2.set_ylabel("Cost in US-$")
+    ax.set_xlabel("Number of allowed iterations")
+
+    return (
+        fig,
+        list(
+            zip(
+                PRESET_NAMES,
+                [[len(info.kills) for info in stats_per_iteration_limit[preset]] for preset in PRESETS],
+                [
+                    [sum([u.cost for u in info.usages]) for info in stats_per_iteration_limit[preset]]
+                    for preset in PRESETS
+                ],
+            )
+        ),
+    )
+
+
+# %% Other Stuff
+# ======================================================================================================================
+
+
+class ____Other_Stuff:  # mark this in the outline
+    pass
 
 
 # %% Plot killed mutants by number of claims
@@ -4320,7 +4709,42 @@ data[(data["preset"] == PRESETS[0]) & data["cosmic_ray_full.killed_by_any"] & da
 
 data[(data["mutant_killed"]) & ~data["cosmic_ray_full.killed_by_any"]]["long_id"]
 
+data[data["num_final_test_cases"] == 3]
 
-# %%
+# %% Count timeouts
 
-len(data[data["mutant_killed"] & data["claimed_equivalent"]])
+
+@block
+def count_cosmic_ray_timeouts():
+    timeouts = 0
+    runs = 0
+    # Maps (project, preset) to a map that maps (target_path, mutant_op, occurrence) to mutant test result
+    for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
+        results_dir = (mutants_path / ".." / "..").resolve()
+        id = LongId.parse_quoted(results_dir.name)
+        results = read_mutant_results(results_dir / "cosmic-ray-full" / "mutants.sqlite", id.project)
+        for result in results.values():
+            if "Timeout" in result.output:
+                timeouts += 1
+            runs += 1
+
+    print(f"{timeouts} timeouts out of {runs} runs")
+
+
+# %% Save minimized pynguin test suites
+
+
+@block
+def dump_minimized_pynguin_tests():
+    tests = {}
+    for project in PROJECTS:
+        tests_per_project = {}
+
+        for index in range(1, 31):
+            mini = minimized_pynguin_test_suites.get((project, index))
+            if mini is not None:
+                tests_per_project[index] = list(mini.tests_minimized_by_mutation_score.tests)
+
+        tests[project] = tests_per_project
+    with (OUTPUT_PATH / "pynguin_minimized_tests.json").open("w") as f:
+        json.dump(tests, f)
