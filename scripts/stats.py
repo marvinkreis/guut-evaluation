@@ -539,6 +539,8 @@ def read_coverage_py_json(coverage_json: JsonObj) -> Coverage:
     missing_branches = []
     executed_branches = []
     for file_name, file in coverage_json["files"].items():
+        if file_name.startswith("docstring_parser/tests/"):
+            continue
         missing_lines += [LineId(file_name, line) for line in file["missing_lines"]]
         executed_lines += [LineId(file_name, line) for line in file["executed_lines"]]
         missing_branches += [BranchId(file_name, branch[0], branch[1]) for branch in file["missing_branches"]]
@@ -1216,7 +1218,7 @@ data["num_incomplete_responses"] = data["conversation"].map(
 
 
 loc_per_test = json.loads((REPO_PATH / "other_data" / "guut_loc_per_test.json").read_text())
-loc_per_test = {Path(path).stem for path, loc in loc_per_test.items()}
+loc_per_test = {Path(path).stem: loc for path, loc in loc_per_test.items()}
 
 # %% Pynguin LOC
 
@@ -1226,7 +1228,8 @@ def prepare_pynguin_loc(loc):
     for path, loc in loc.items():
         path = Path(path)
         parts = path.parts
-        new_loc[f"{parts[1]}::{parts[0]}::{path.stem}"]
+        new_loc[f"{parts[1]}::{parts[0]}::{path.stem}"] = loc
+    return new_loc
 
 
 pynguin_loc_per_test = prepare_pynguin_loc(
@@ -3047,6 +3050,7 @@ def plot_line_coverage_with_pynguin_distplot():
         num_covered = []
         for project in PROJECTS:
             num_covered.append(len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project]))
+            # print(f"{len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project])} {preset} {project}")
         values.append(num_covered)
 
     # Pynguin combined runs
@@ -3596,9 +3600,10 @@ def plot_loc_distplot():
 
             project_loc = 0
             for key, loc in pynguin_loc_per_test.items():
-                if key.startswith(f"{index}::{project}"):
+                if key.startswith(f"{index:02}::{project}"):
                     project_loc += loc
 
+            # print(f"{project_loc} {project} {index}")
             pynguin_values.append(project_loc)
     values.append(pynguin_values)
 
@@ -4243,19 +4248,19 @@ def plot_number_of_minimized_test_cases_distplot():
     labels = []
 
     # Minimized test suites
-    # for preset, name in zip(PRESETS, PRESET_NAMES):
-    #     labels.append(name)
-    #     values.append(
-    #         [
-    #             sum(
-    #                 [
-    #                     num_cases_per_test[t]
-    #                     for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
-    #                 ]
-    #             )
-    #             for project in PROJECTS
-    #         ]
-    #     )
+    for preset, name in zip(PRESETS, PRESET_NAMES):
+        labels.append(name)
+        values.append(
+            [
+                sum(
+                    [
+                        num_cases_per_test[t]
+                        for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
+                    ]
+                )
+                for project in PROJECTS
+            ]
+        )
 
     labels.append("Pynguin (individual)")
     values.append([len(s.tests_minimized_by_mutation_score.tests) for s in minimized_pynguin_test_suites.values()])
@@ -4290,7 +4295,7 @@ def plot_loc_of_minimized_test_suites_distplot():
             [
                 sum(
                     [
-                        loc_per_test[t + ".py"]
+                        loc_per_test[t]
                         for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
                     ]
                 )
@@ -4307,7 +4312,7 @@ def plot_loc_of_minimized_test_suites_distplot():
 
             project_loc = 0
             for key, loc in pynguin_loc_per_test_minimized_individual.items():
-                if key.startswith(f"{index}::{project}"):
+                if key.startswith(f"{index:02}::{project}"):
                     project_loc += loc
 
             pynguin_values.append(project_loc)
@@ -4844,3 +4849,9 @@ def dump_minimized_pynguin_tests_combined():
 # %%
 
 pynguin_data[pynguin_data["failing_tests"].map(len) != 0].head()
+
+
+# %%
+for pre, pro in itertools.product(PRESETS, PROJECTS):
+    num = sum([loc_per_test[t] for t in minimized_test_suites[(pre, pro)].tests_minimized_by_mutation_score[0]])
+    print(f"{pre} {pro} {num}")
