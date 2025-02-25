@@ -49,12 +49,13 @@
 
 import ast
 import itertools
+import gzip
 import json
 import os
 import sqlite3
 import math
 import re
-import subprocess
+from io import StringIO
 from functools import partial, reduce
 from multiprocessing import Pool
 from pathlib import Path
@@ -82,7 +83,6 @@ type JsonObj = Dict[str, Any]
 OUTPUT_PATH = Path("/tmp/out")
 OUTPUT_PATH.mkdir(exist_ok=True)
 
-subprocess
 
 # %% Find result directories
 
@@ -673,25 +673,25 @@ def add_cosmic_ray_results_to_data():
     for mutants_path in RESULTS_DIR.glob("*/cosmic-ray*/mutants.sqlite"):
         results_dir = (mutants_path / ".." / "..").resolve()
         id = LongId.parse_quoted(results_dir.name)
-        cosmic_ray_results[(id.project, id.preset, "exitfirst")] = read_mutant_results(
-            results_dir / "cosmic-ray" / "mutants.sqlite", id.project
-        )
+        # cosmic_ray_results[(id.project, id.preset, "exitfirst")] = read_mutant_results(
+        #     results_dir / "cosmic-ray" / "mutants.sqlite", id.project
+        # )
         cosmic_ray_results[(id.project, id.preset, "full")] = read_mutant_results(
             results_dir / "cosmic-ray-full" / "mutants.sqlite", id.project
         )
 
-    data["cosmic_ray.killed_by_own"] = data.apply(
-        lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][MutantId.from_row(row)].killed,
-        axis=1,
-    )
-    presets = list(data["preset"].unique())
-    data["cosmic_ray.killed_by_any"] = data.apply(
-        lambda row: any(
-            cosmic_ray_results[(row["project"], preset, "exitfirst")][MutantId.from_row(row)].killed
-            for preset in presets
-        ),
-        axis=1,
-    )
+    # data["cosmic_ray.killed_by_own"] = data.apply(
+    #     lambda row: cosmic_ray_results[(row["project"], row["preset"], "exitfirst")][MutantId.from_row(row)].killed,
+    #     axis=1,
+    # )
+    # presets = list(data["preset"].unique())
+    # data["cosmic_ray.killed_by_any"] = data.apply(
+    #     lambda row: any(
+    #         cosmic_ray_results[(row["project"], preset, "exitfirst")][MutantId.from_row(row)].killed
+    #         for preset in presets
+    #     ),
+    #     axis=1,
+    # )
 
     data["cosmic_ray_full.killed_by_own"] = data.apply(
         lambda row: cosmic_ray_results[(row["project"], row["preset"], "full")][MutantId.from_row(row)].killed,
@@ -758,7 +758,9 @@ for mutants_path in PYNGUIN_TESTS_DIR.glob("*/*/cosmic-ray/mutants.sqlite"):
         pynguin_data["index"].append(int(index))
         pynguin_data["mutant_id"].append(mutant_id)
         pynguin_data["killed"].append(cosmic_ray_info.killed)
-        pynguin_data["failing_tests"].append(get_failing_tests_for_pynguin_output(cosmic_ray_info.output))
+        failing_tests = get_failing_tests_for_pynguin_output(cosmic_ray_info.output)
+        failing_tests = [f"{index}::{project}::{name}" for name in failing_tests]
+        pynguin_data["failing_tests"].append(failing_tests)
 pynguin_data = pd.DataFrame(pynguin_data)
 
 
@@ -795,7 +797,8 @@ for project in pynguin_data["project"].unique():
 
 # %% Read raw Pynguin results
 
-raw_pynguin_data = pd.read_csv(PYNGUIN_TESTS_DIR / "results.csv")
+with gzip.open(REPO_PATH / "other_data" / "raw_pynguin_results.csv.gz") as g:
+    raw_pynguin_data = pd.read_csv(StringIO(g.read().decode()))
 raw_pynguin_data["TotalCost"] = (
     raw_pynguin_data["TotalTime"] / 1000000000 / 3600 * 0.0384
 )  # 0.0384US-$/h fuer eine vergleichbare AWS-VM
@@ -1213,13 +1216,27 @@ data["num_incomplete_responses"] = data["conversation"].map(
 
 
 loc_per_test = json.loads((REPO_PATH / "other_data" / "guut_loc_per_test.json").read_text())
+loc_per_test = {Path(path).stem for path, loc in loc_per_test.items()}
 
 # %% Pynguin LOC
 
 
-pynguin_loc_per_test = json.loads((REPO_PATH / "other_data" / "pynguin_loc_per_test.json").read_text())
-pynguin_minimized_loc_per_test = json.loads(
-    (REPO_PATH / "other_data" / "pynguin_minimized_loc_per_test.json").read_text()
+def prepare_pynguin_loc(loc):
+    new_loc = {}
+    for path, loc in loc.items():
+        path = Path(path)
+        parts = path.parts
+        new_loc[f"{parts[1]}::{parts[0]}::{path.stem}"]
+
+
+pynguin_loc_per_test = prepare_pynguin_loc(
+    json.loads((REPO_PATH / "other_data" / "pynguin_loc_per_test_file.json").read_text())
+)
+pynguin_loc_per_test_minimized_individual = prepare_pynguin_loc(
+    json.loads((REPO_PATH / "other_data" / "pynguin_loc_per_test_file_minimized_individual.json").read_text())
+)
+pynguin_loc_per_test_minimized_combined = prepare_pynguin_loc(
+    json.loads((REPO_PATH / "other_data" / "pynguin_loc_per_test_file_minimized_combined.json").read_text())
 )
 
 
@@ -3553,7 +3570,7 @@ def plot_number_of_test_cases_distplot():
     return fig, list(zip(labels, values))
 
 
-# %% Plot mean number of tests per mutant with Pynguin
+# %% Plot mean number of loc per project
 
 
 @block
@@ -3567,7 +3584,7 @@ def plot_loc_distplot():
 
         for project in PROJECTS:
             group = grouped_data.get_group((preset, project))
-            num_loc_per_project.append(sum([loc_per_test.get(id + ".py") or 0 for id in group["escaped_long_id"]]))
+            num_loc_per_project.append(sum([loc_per_test.get(id) or 0 for id in group["escaped_long_id"]]))
 
         values.append([int(n) for n in num_loc_per_project])
 
@@ -3589,7 +3606,7 @@ def plot_loc_distplot():
     labels = PRESET_NAMES + ["Pynguin (individual)"]
     ax.set_xticks(np.arange(len(values)))
     ax.set_xticklabels(labels, rotation=90)
-    ax.set_ylabel("Number of tests")
+    ax.set_ylabel("Lines of code")
     distribution_plot(values, ax=ax)
 
     return fig, list(zip(labels, values))
@@ -4177,6 +4194,44 @@ def minimize_pynguin_test_suites():
 
 minimized_pynguin_test_suites = minimize_pynguin_test_suites()
 
+# %% Minimized combined Pynguin test suites
+
+
+def minimize_combined_pynguin_test_suites():
+    minimized_suites = {}
+
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        group = pynguin_data[pynguin_data["project"] == project]
+
+        large_suite = set(flatten(group["failing_tests"]))
+        large_suite_kills = get_pynguin_kills(group, large_suite)
+
+        minimized_suite_by_ms = minimize_pynguin_test_suite_by_ms(group)
+        minimized_suite_by_ms_kills = get_pynguin_kills(group, minimized_suite_by_ms)
+
+        minimized_suites[project] = MinimizedTestSuites(
+            TestSuiteWithKills(large_suite, large_suite_kills),
+            TestSuiteWithKills(minimized_suite_by_ms, minimized_suite_by_ms_kills),
+            None,
+            None,
+        )
+
+        print(f"\n{project}")
+        print(f"unminimized test cases: {len(large_suite)}")
+        print(f"unminimized kills: {len(large_suite_kills)}")
+        # print(f"unminimized test cases: {sum([num_cases_per_test[test] for test in large_suite])}")
+        print(f"minimized by MS test cases: {len(minimized_suite_by_ms)}")
+        print(f"minimized by MS kills: {len(minimized_suite_by_ms_kills)}")
+        # print(f"minimized by MS test cases: {sum([num_cases_per_test[test] for test in minimized_suite])}")
+
+    return minimized_suites
+
+
+minimized_combined_pynguin_test_suites = minimize_combined_pynguin_test_suites()
+
 
 # %% Plot number of tests cases in minimized test suites
 
@@ -4188,22 +4243,27 @@ def plot_number_of_minimized_test_cases_distplot():
     labels = []
 
     # Minimized test suites
-    for preset, name in zip(PRESETS, PRESET_NAMES):
-        labels.append(name)
-        values.append(
-            [
-                sum(
-                    [
-                        num_cases_per_test[t]
-                        for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
-                    ]
-                )
-                for project in PROJECTS
-            ]
-        )
+    # for preset, name in zip(PRESETS, PRESET_NAMES):
+    #     labels.append(name)
+    #     values.append(
+    #         [
+    #             sum(
+    #                 [
+    #                     num_cases_per_test[t]
+    #                     for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
+    #                 ]
+    #             )
+    #             for project in PROJECTS
+    #         ]
+    #     )
 
     labels.append("Pynguin (individual)")
     values.append([len(s.tests_minimized_by_mutation_score.tests) for s in minimized_pynguin_test_suites.values()])
+
+    labels.append("Pynguin (combined)")
+    values.append(
+        [len(s.tests_minimized_by_mutation_score.tests) for s in minimized_combined_pynguin_test_suites.values()]
+    )
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
     ax.set_xticks(np.arange(len(values)))
@@ -4246,17 +4306,28 @@ def plot_loc_of_minimized_test_suites_distplot():
                 continue
 
             project_loc = 0
-            for key, loc in pynguin_minimized_loc_per_test.items():
+            for key, loc in pynguin_loc_per_test_minimized_individual.items():
                 if key.startswith(f"{index}::{project}"):
                     project_loc += loc
 
             pynguin_values.append(project_loc)
     values.append(pynguin_values)
 
+    labels.append("Pynguin (combined)")
+    pynguin_values = []
+    for project in PROJECTS:
+        project_loc = 0
+        for key, loc in pynguin_loc_per_test_minimized_combined.items():
+            if re.match(rf"\d\d::{project}", key):
+                project_loc += loc
+        # print(f"{project}, {project_loc}")
+        pynguin_values.append(project_loc)
+    values.append(pynguin_values)
+
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
     ax.set_xticks(np.arange(len(values)))
     ax.set_xticklabels(labels, rotation=90)
-    ax.set_ylabel("Number of tests")
+    ax.set_ylabel("Lines of code")
     distribution_plot(values, ax=ax)
 
     return fig, list(zip(labels, values))
@@ -4735,7 +4806,7 @@ def count_cosmic_ray_timeouts():
 
 
 @block
-def dump_minimized_pynguin_tests():
+def dump_minimized_pynguin_tests_individual():
     tests = {}
     for project in PROJECTS:
         tests_per_project = {}
@@ -4746,5 +4817,30 @@ def dump_minimized_pynguin_tests():
                 tests_per_project[index] = list(mini.tests_minimized_by_mutation_score.tests)
 
         tests[project] = tests_per_project
-    with (OUTPUT_PATH / "pynguin_minimized_tests.json").open("w") as f:
+    with (OUTPUT_PATH / "pynguin_minimized_tests_individual.json").open("w") as f:
         json.dump(tests, f)
+
+
+@block
+def dump_minimized_pynguin_tests_combined():
+    tests = {}
+    for project in PROJECTS:
+        tests_per_project = {}
+
+        mini = minimized_combined_pynguin_test_suites.get(project)
+        if mini is None:
+            continue
+
+        for index in range(1, 31):
+            tests_per_project[index] = [
+                name for name in mini.tests_minimized_by_mutation_score.tests if int(name.split("::")[0]) == index
+            ]
+        tests[project] = tests_per_project
+
+    with (OUTPUT_PATH / "pynguin_minimized_tests_combined.json").open("w") as f:
+        json.dump(tests, f)
+
+
+# %%
+
+pynguin_data[pynguin_data["failing_tests"].map(len) != 0].head()
