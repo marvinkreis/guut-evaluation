@@ -3050,7 +3050,9 @@ def plot_line_coverage_with_pynguin_distplot():
         num_covered = []
         for project in PROJECTS:
             num_covered.append(len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project]))
-            # print(f"{len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project])} {preset} {project}")
+            # print(
+            #     f"{len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project])} {preset} {project}"
+            # )
         values.append(num_covered)
 
     # Pynguin combined runs
@@ -3077,6 +3079,7 @@ def plot_line_coverage_with_pynguin_distplot():
 
             coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
             num_avg_pynguin_covered.append(len(coverage.executed_lines) / len(all_seen_lines_map[project]))
+            # print(f"{len(coverage.executed_lines) / len(all_seen_lines_map[project])} {project} {index}")
     values.append(num_avg_pynguin_covered)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
@@ -3091,6 +3094,8 @@ def plot_line_coverage_with_pynguin_distplot():
 
     ax.yaxis.set_major_formatter(format_perecent())
     ax.set_ylabel("Line Coverage")
+
+    mannwhitneyu_test(values, labels, "mannwhitneyu_plot_line_coverage_with_pynguin_distplot.csv")
     return fig, list(zip(labels, values))
 
 
@@ -3107,6 +3112,9 @@ def plot_branch_coverage_with_pynguin_distplot():
             num_covered.append(
                 len(coverage_map[(preset, project)].executed_branches) / len(all_seen_branches_map[project])
             )
+            # print(
+            #     f"{len(coverage_map[(preset, project)].executed_branches) / len(all_seen_branches_map[project])} {preset} {project}"
+            # )
         values.append(num_covered)
 
     # Pynguin combined runs
@@ -3133,6 +3141,7 @@ def plot_branch_coverage_with_pynguin_distplot():
 
             coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
             num_avg_pynguin_covered.append(len(coverage.executed_branches) / len(all_seen_branches_map[project]))
+            # print(f"{len(coverage.executed_branches) / len(all_seen_branches_map[project])} {project} {index}")
     values.append(num_avg_pynguin_covered)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
@@ -3147,107 +3156,9 @@ def plot_branch_coverage_with_pynguin_distplot():
 
     ax.yaxis.set_major_formatter(format_perecent())
     ax.set_ylabel("Branch Coverage")
+
+    mannwhitneyu_test(values, labels, "mannwhitneyu_plot_branch_coverage_with_pynguin_distplot.csv")
     return fig, list(zip(labels, values))
-
-
-# %% Mann Whitney U test with plot values from mean line coverage plot
-
-
-@block
-def line_coverage_mannwhitneyu_test():
-    values = []
-    for preset in PRESETS:
-        num_covered = []
-        for project in PROJECTS:
-            num_covered.append(len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project]))
-        values.append(num_covered)
-
-    # Pynguin combined runs
-    num_combined_pynguin_covered = []
-    for project in PROJECTS:
-        covered_lines_per_project = set()
-
-        for index in range(1, 31):
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            covered_lines_per_project.update(coverage.executed_lines)
-
-        num_combined_pynguin_covered.append(len(covered_lines_per_project) / len(all_seen_lines_map[project]))
-    values.append(num_combined_pynguin_covered)
-
-    # Pynguin avg runs
-    num_avg_pynguin_covered = []
-    for project in PROJECTS:
-        num_covered_lines_per_project = 0
-
-        for index in range(1, 31):
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_covered_lines_per_project += len(coverage.executed_lines) / len(all_seen_lines_map[project])
-
-        num_avg_pynguin_covered.append(num_covered_lines_per_project / get_num_pynguin_runs_per_project(project))
-    values.append(num_avg_pynguin_covered)
-
-    # Pynguin individual runs
-    num_individual_pynguin_covered = []
-    for project in PROJECTS:
-        for index in range(1, 31):
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_individual_pynguin_covered.append(len(coverage.executed_lines) / len(all_seen_lines_map[project]))
-
-    values.append(num_individual_pynguin_covered)
-
-    names = PRESETS + ["pynguin_combined", "pynguin_avg", "pynguin_individual"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_plot_line_coverage_with_pynugin.csv")
-
-
-# %% Mann Whitney U test with plot values from mean branch coverage plot
-
-
-@block
-def branch_coverage_mannwhitneyu_test():
-    values = []
-    for preset in PRESETS:
-        num_covered = []
-        for project in PROJECTS:
-            num_covered.append(
-                len(coverage_map[(preset, project)].executed_branches) / len(all_seen_branches_map[project])
-            )
-        values.append(num_covered)
-
-    # Pynguin combined runs
-    num_combined_pynguin_covered = []
-    for project in PROJECTS:
-        covered_branches_per_project = set()
-
-        for index in range(1, 31):
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            covered_branches_per_project.update(coverage.executed_branches)
-
-        num_combined_pynguin_covered.append(len(covered_branches_per_project) / len(all_seen_branches_map[project]))
-    values.append(num_combined_pynguin_covered)
-
-    # Pynguin avg runs
-    num_avg_pynguin_covered = []
-    for project in PROJECTS:
-        num_covered_branches_per_project = 0
-
-        for index in range(1, 31):
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_covered_branches_per_project += len(coverage.executed_branches) / len(all_seen_branches_map[project])
-
-        num_avg_pynguin_covered.append(num_covered_branches_per_project / get_num_pynguin_runs_per_project(project))
-    values.append(num_avg_pynguin_covered)
-
-    # Pynguin individual runs
-    num_individual_pynguin_covered = []
-    for project in PROJECTS:
-        for index in range(1, 31):
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_individual_pynguin_covered.append(len(coverage.executed_branches) / len(all_seen_branches_map[project]))
-
-    values.append(num_individual_pynguin_covered)
-
-    names = PRESETS + ["pynguin_combined", "pynguin_avg", "pynguin_individual"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_plot_branch_coverage_with_pynugin.csv")
 
 
 # %% Mutation score
@@ -3330,6 +3241,7 @@ def plot_mutation_score_with_pynguin_distplot():
         for project in PROJECTS:
             group = grouped_data.get_group((preset, project))
             killed_mutants.append(group["cosmic_ray_full.killed_by_own"].sum() / len(group))
+            # print(f"{group['cosmic_ray_full.killed_by_own'].sum() / len(group)} {preset} {project}")
         values.append(killed_mutants)
 
     # Pynguin combined runs
@@ -3353,6 +3265,7 @@ def plot_mutation_score_with_pynguin_distplot():
             if group["killed"].sum() == 0:
                 print(project, index)
             num_all_pynguin.append(group["killed"].sum() / len(group))
+            # print(f"{group['killed'].sum() / len(group)} {project} {index}")
     values.append(num_all_pynguin)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4, 6))
@@ -3367,6 +3280,8 @@ def plot_mutation_score_with_pynguin_distplot():
 
     ax.yaxis.set_major_formatter(format_perecent())
     ax.set_ylabel("Mutation Score")
+
+    mannwhitneyu_test(values, labels, "mannwhitneyu_plot_mutation_score_with_pynguin_distplot.csv")
     return fig, list(zip(labels, values))
 
 
@@ -3394,46 +3309,7 @@ def mutation_scores_mannwhitneyu_test():
     values.append(list(data[data["preset"] == PRESETS[0]].apply(get_avg_kills_for_mutant, axis=1)))
 
     names = PRESETS + ["pynguin_combined", "pynguin_avg"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_plot_mutation_score_with_pynugin.csv")
-
-
-# %% Mann Whitney U test with values from mean mutation scores plot, grouped by project
-
-
-@block
-def mutation_scores_per_project_mannwhitneyu_test():
-    values = []
-    for preset in PRESETS:
-        kills_per_project = []
-        for project in PROJECTS:
-            group = data[(data["preset"] == preset) & (data["project"] == project)]
-            kills_per_project.append(group["cosmic_ray_full.killed_by_own"].sum())
-        values.append(kills_per_project)
-
-    def get_avg_kills_for_mutant(row):
-        num_runs = get_num_pynguin_runs_per_project(row["project"])
-        num_kills = row["pynguin.cosmic_ray.num_kills"]
-        if num_runs == 0:
-            if num_kills != 0:
-                raise Exception("shouldn't happen")
-            else:
-                return 0
-        return num_kills / num_runs
-
-    combined_pynguin_kills_per_project = []
-    for project in PROJECTS:
-        group = data[(data["preset"] == PRESETS[0]) & (data["project"] == project)]
-        combined_pynguin_kills_per_project.append(group["pynguin.cosmic_ray.killed_by_any"].sum())
-    values.append(combined_pynguin_kills_per_project)
-
-    avg_pynguin_kills_per_project = []
-    for project in PROJECTS:
-        group = data[(data["preset"] == PRESETS[0]) & (data["project"] == project)]
-        avg_pynguin_kills_per_project.append(group.apply(get_avg_kills_for_mutant, axis=1).sum())
-    values.append(avg_pynguin_kills_per_project)
-
-    names = PRESETS + ["pynguin_combined", "pynguin_avg"]
-    mannwhitneyu_test(values, names, "mannwhitneyu_plot_mutation_score_per_project_with_pynugin.csv")
+    mannwhitneyu_test(values, names, "mannwhitneyu_mutation_score_individual_with_pynugin.csv")
 
 
 # %% Plot number of killed mutants with best Pynguin run
@@ -3571,6 +3447,7 @@ def plot_number_of_test_cases_distplot():
     ax.set_ylabel("Number of tests")
     distribution_plot(values, ax=ax)
 
+    mannwhitneyu_test(values, labels, "mannwhitneyu_number_of_test_cases_distplot.csv")
     return fig, list(zip(labels, values))
 
 
@@ -3614,6 +3491,7 @@ def plot_loc_distplot():
     ax.set_ylabel("Lines of code")
     distribution_plot(values, ax=ax)
 
+    mannwhitneyu_test(values, labels, "mannwhitneyu_loc_distplot.csv")
     return fig, list(zip(labels, values))
 
 
@@ -3633,6 +3511,17 @@ def mannwhitneyu_number_of_test_cases():
 
         values.append(num_tests_per_project)
 
+    # Pynguin runs
+    num_all_pynguin_tests = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            num_tests = pynguin_num_tests_map.get((project, index), 0)
+            num_all_pynguin_tests.append(num_tests)
+    values.append(num_all_pynguin_tests)
+
     # Pynguin avg runs
     num_avg_pynguin_tests = []
     for project in PROJECTS:
@@ -3645,7 +3534,7 @@ def mannwhitneyu_number_of_test_cases():
         num_avg_pynguin_tests.append(num_tests_per_project / get_num_pynguin_runs_per_project(project))
     values.append(num_avg_pynguin_tests)
 
-    labels = PRESET_NAMES + ["Pynguin (average)"]
+    labels = PRESET_NAMES + ["Pynguin (individual)", "Pynguin (average)"]
     mannwhitneyu_test(values, labels, "mannwhitneyu_plot_number_of_test_cases.csv")
 
 
@@ -3692,6 +3581,36 @@ def plot_num_turns_success():
         list(zip(PRESETS, PRESET_NAMES)),
         "Number of iterations",
         lambda df: df[df["mutant_killed"]]["num_turns"],
+    ), plot_data.transpose().to_dict()
+
+
+# %% Number of turns for a successful test
+
+
+@block
+@savefig
+def plot_num_turns_fail():
+    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
+    return plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS, PRESET_NAMES)),
+        "Number of iterations",
+        lambda df: df[df["outcome"] == FAIL]["num_turns"],
+    ), plot_data.transpose().to_dict()
+
+
+# %% Number of turns for a successful test
+
+
+@block
+@savefig
+def plot_num_turns_equivalent():
+    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
+    return plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS[1:], PRESET_NAMES[1:])),
+        "Number of iterations",
+        lambda df: df[df["claimed_equivalent"]]["num_turns"],
     ), plot_data.transpose().to_dict()
 
 
@@ -4276,6 +4195,7 @@ def plot_number_of_minimized_test_cases_distplot():
     ax.set_ylabel("Number of tests")
     distribution_plot(values, ax=ax)
 
+    mannwhitneyu_test(values, labels, "mannwhitneyu_plot_number_of_minimized_test_cases_distplot.csv")
     return fig, list(zip(labels, values))
 
 
@@ -4335,6 +4255,7 @@ def plot_loc_of_minimized_test_suites_distplot():
     ax.set_ylabel("Lines of code")
     distribution_plot(values, ax=ax)
 
+    mannwhitneyu_test(values, labels, "mannwhitneyu_plot_loc_of_minimized_test_cases_distplot.csv")
     return fig, list(zip(labels, values))
 
 
@@ -4361,6 +4282,8 @@ class IterationLimitInfo(NamedTuple):
     successful_runs: List[MutantId]
     kills: Set[MutantId]
     usages: List[Usage]
+    covered_lines: List[str]
+    covered_branches: List[str]
 
 
 def get_usage_for_n_iterations(conversation, n) -> Usage:
@@ -4401,7 +4324,7 @@ def calculate_number_of_kills_per_iteration_limit():
     grouped_data = data.groupby("preset")
 
     for preset in PRESETS:
-        print(f"\n{preset}")
+        # print(f"\n{preset}")
         group = grouped_data.get_group(preset)
         values = []
 
@@ -4413,9 +4336,9 @@ def calculate_number_of_kills_per_iteration_limit():
             # if we ignore the successful runs, we get exponential growth
             # seems like the fact that some runs end at each iteration counteract this
             # usages = get_total_usages_for_n_iterations(group[~group["mutant_killed"]], num_turns)
-            print(f"number of test files for {num_turns} its: {len(successful_runs)}")
-            print(f"number killed mutants for {num_turns} its: {len(kills)}")
-            print(f"cost for {num_turns} its: {sum([u.cost for u in usages])}")
+            # print(f"number of test files for {num_turns} its: {len(successful_runs)}")
+            # print(f"number killed mutants for {num_turns} its: {len(kills)}")
+            # print(f"cost for {num_turns} its: {sum([u.cost for u in usages])}")
             values.append(IterationLimitInfo(num_turns, successful_runs, kills, usages))
 
         stats_per_iteration_limit[preset] = values
