@@ -16,5 +16,5 @@ docker container run --rm -it \
     --entrypoint "/scripts/entrypoint.sh" \
     -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
     -e OPENAI_ORGANIZATION="${OPENAI_ORGANIZATION}" \
-    guut-emse "$@"
+    guut-emse-reproduction "$@"
 

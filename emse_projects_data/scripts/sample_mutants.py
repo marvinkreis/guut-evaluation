@@ -6,6 +6,13 @@ from pathlib import Path
 NUM_MUTANTS = 1000
 
 
+"""
+Samples up to NUM_MUTANTS mutants from a session file.
+Usage: ./script session_file [session_file...]
+- session_file: mutants session file from cosmic ray
+"""
+
+
 def delete_mutants(cur: sqlite3.Cursor, mutants):
     cur.executemany(
         "delete from mutation_specs where job_id = ?;",

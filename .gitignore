@@ -1,5 +1,6 @@
 __pycache__
 .ipynb_checkpoints
+.ruff_cache
 /emse_projects/
 /guut_emse_results/
 /guut_emse_logs/

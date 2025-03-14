@@ -1,10 +1,16 @@
-# ./run_image.sh run_emse_benchmark debugging-zero-shot flake8
-
 import sys
 import json
 import shutil
 import sqlite3
 from pathlib import Path
+
+
+"""
+Removes all done mutants from a session file.
+Usage: ./script session_file results_dir
+- session_file: mutants session file from cosmic ray
+- results_dir: results directory from guut
+"""
 
 
 mutants_file = Path(sys.argv[1])

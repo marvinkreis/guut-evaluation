@@ -1,0 +1,221 @@
+{
+  "baseline_with_iterations_apimd_e75866e1": [
+    "baseline_with_iterations_apimd_compiler_py_core_ReplaceBinaryOperator_Add_Div_21_8e826c46",
+    "baseline_with_iterations_apimd_main_py_core_AddNot_2_ce9140cf",
+    "baseline_with_iterations_apimd_main_py_core_ReplaceComparisonOperator_Eq_GtE_2_e377eed2"
+  ],
+  "baseline_with_iterations_codetiming_5284bbae": [
+    "baseline_with_iterations_codetiming_timer_py_core_NumberReplacer_2_4c416f9c"
+  ],
+  "baseline_with_iterations_dataclasses_json_8e7d7696": [
+    "baseline_with_iterations_dataclasses_json_core_py_core_AddNot_6_4ff93857"
+  ],
+  "baseline_with_iterations_docstring_parser_0d09ea5e": [
+    "baseline_with_iterations_docstring_parser_google_py_core_ReplaceBinaryOperator_Add_BitXor_0_a6a43a44"
+  ],
+  "baseline_with_iterations_flake8_fd081802": [
+    "baseline_with_iterations_flake8_checker_py_core_ReplaceComparisonOperator_Eq_Lt_11_e758d129",
+    "baseline_with_iterations_flake8_checker_py_core_NumberReplacer_82_d6d3d1a1",
+    "baseline_with_iterations_flake8_processor_py_core_ExceptionReplacer_2_ae34c716",
+    "baseline_with_iterations_flake8_processor_py_core_ReplaceFalseWithTrue_2_e6c1e70b",
+    "baseline_with_iterations_flake8_processor_py_core_ReplaceBinaryOperator_Mul_BitOr_0_e4fca147",
+    "baseline_with_iterations_flake8_checker_py_core_ReplaceUnaryOperator_Delete_Not_2_25318539",
+    "baseline_with_iterations_flake8_processor_py_core_NumberReplacer_3_c73f0c2f",
+    "baseline_with_iterations_flake8_processor_py_core_ReplaceFalseWithTrue_1_23031286",
+    "baseline_with_iterations_flake8_processor_py_core_AddNot_3_5fb9a35e",
+    "baseline_with_iterations_flake8_processor_py_core_NumberReplacer_17_c8e7314f",
+    "baseline_with_iterations_flake8_processor_py_core_ReplaceBinaryOperator_Mul_LShift_0_ee5221de",
+    "baseline_with_iterations_flake8_checker_py_core_AddNot_13_87dd0052"
+  ],
+  "baseline_with_iterations_flutes_94f55366": [
+    "baseline_with_iterations_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_Add_9_c0f91cf7",
+    "baseline_with_iterations_flutes_multiproc_py_core_NumberReplacer_101_3c008bef",
+    "baseline_with_iterations_flutes_multiproc_py_core_ReplaceComparisonOperator_NotEq_Is_0_e0dc0e42",
+    "baseline_with_iterations_flutes_multiproc_py_core_ReplaceComparisonOperator_Lt_Gt_1_8beb7692",
+    "baseline_with_iterations_flutes_multiproc_py_core_NumberReplacer_13_74f435e6",
+    "baseline_with_iterations_flutes_multiproc_py_core_ReplaceComparisonOperator_Lt_LtE_1_a80ceca9",
+    "baseline_with_iterations_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_BitXor_1_250a3659"
+  ],
+  "baseline_with_iterations_flutils_d2e7996b": [
+    "baseline_with_iterations_flutils_moduleutils_py_core_ReplaceComparisonOperator_NotEq_GtE_1_585ae054",
+    "baseline_with_iterations_flutils_cmdutils_py_core_ReplaceComparisonOperator_Is_NotEq_0_9a35f6e0",
+    "baseline_with_iterations_flutils_moduleutils_py_core_ReplaceBinaryOperator_Mod_RShift_6_65f3bcf5",
+    "baseline_with_iterations_flutils_pathutils_py_core_AddNot_18_d95eb3a6"
+  ],
+  "baseline_with_iterations_httpie_2d46b781": [
+    "baseline_with_iterations_httpie_downloads_py_core_ReplaceBinaryOperator_Add_LShift_10_ee6ce8a7",
+    "baseline_with_iterations_httpie_config_py_core_ReplaceBinaryOperator_Div_RShift_1_95b119e9",
+    "baseline_with_iterations_httpie_context_py_core_AddNot_1_8a4617d7"
+  ],
+  "baseline_with_iterations_pdir_092bf796": [
+    "baseline_with_iterations_pdir_api_py_core_ReplaceComparisonOperator_Eq_Lt_0_8b400664"
+  ],
+  "baseline_with_iterations_string_utils_fe9898c5": [
+    "baseline_with_iterations_string_utils_generation_py_core_ReplaceBinaryOperator_Add_Sub_0_59c57767",
+    "baseline_with_iterations_string_utils_generation_py_core_ReplaceBinaryOperator_Add_BitOr_0_79d64802",
+    "baseline_with_iterations_string_utils_generation_py_core_ReplaceBinaryOperator_Add_Mul_0_dd280689"
+  ],
+  "baseline_without_iterations_apimd_4587a1a5": [],
+  "baseline_without_iterations_codetiming_0b15068b": [],
+  "baseline_without_iterations_dataclasses_json_a7f11def": [],
+  "baseline_without_iterations_docstring_parser_7a9594d3": [],
+  "baseline_without_iterations_flake8_f475e47d": [
+    "baseline_without_iterations_flake8_processor_py_core_ReplaceFalseWithTrue_1_aa33bd09",
+    "baseline_without_iterations_flake8_processor_py_core_NumberReplacer_6_1e47ee2b",
+    "baseline_without_iterations_flake8_processor_py_core_ReplaceComparisonOperator_LtE_GtE_0_779bd972"
+  ],
+  "baseline_without_iterations_flutes_4939ac36": [],
+  "baseline_without_iterations_flutils_e3f4363d": [],
+  "baseline_without_iterations_httpie_661756ac": [],
+  "baseline_without_iterations_pdir_a1a75c44": [
+    "baseline_without_iterations_pdir_internal_utils_py_core_AddNot_2_71dfb49d"
+  ],
+  "baseline_without_iterations_string_utils_54d522c5": [
+    "baseline_without_iterations_string_utils_generation_py_core_ReplaceBinaryOperator_Add_Mul_0_59bcf87d",
+    "baseline_without_iterations_string_utils_generation_py_core_ReplaceBinaryOperator_Add_FloorDiv_0_4c9009aa"
+  ],
+  "debugging_one_shot_apimd_50db4cde": [
+    "debugging_one_shot_apimd_main_py_core_ZeroIterationForLoop_0_29984f78",
+    "debugging_one_shot_apimd_compiler_py_core_ReplaceComparisonOperator_Lt_Eq_0_46975c5b"
+  ],
+  "debugging_one_shot_codetiming_22a467b0": [
+    "debugging_one_shot_codetiming_timer_py_core_NumberReplacer_1_60bc4478"
+  ],
+  "debugging_one_shot_dataclasses_json_c765cc4b": [
+    "debugging_one_shot_dataclasses_json_utils_py_core_ReplaceComparisonOperator_Eq_IsNot_2_a6cf0115",
+    "debugging_one_shot_dataclasses_json_utils_py_core_ReplaceComparisonOperator_Eq_Gt_5_2eb843cc"
+  ],
+  "debugging_one_shot_docstring_parser_70d07702": [],
+  "debugging_one_shot_flake8_154090c4": [
+    "debugging_one_shot_flake8_main_debug_py_core_ReplaceUnaryOperator_Delete_Not_0_964868ef",
+    "debugging_one_shot_flake8_processor_py_core_ReplaceUnaryOperator_USub_Not_0_b57f39ed",
+    "debugging_one_shot_flake8_processor_py_core_ReplaceBinaryOperator_Mul_BitOr_0_871e69bc",
+    "debugging_one_shot_flake8_processor_py_core_ReplaceBinaryOperator_Add_BitOr_2_9ff9adba",
+    "debugging_one_shot_flake8_processor_py_core_NumberReplacer_17_5b18a7c7",
+    "debugging_one_shot_flake8_processor_py_core_ReplaceBinaryOperator_Mul_LShift_0_28b56e56",
+    "debugging_one_shot_flake8_processor_py_core_ReplaceFalseWithTrue_2_2a609f05",
+    "debugging_one_shot_flake8_processor_py_core_NumberReplacer_3_139227bf",
+    "debugging_one_shot_flake8_main_debug_py_core_NumberReplacer_2_d71afd73",
+    "debugging_one_shot_flake8_checker_py_core_ReplaceUnaryOperator_Delete_Not_2_d44d66e2"
+  ],
+  "debugging_one_shot_flutes_1295457c": [
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_BitXor_0_bf8363d2",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceComparisonOperator_Eq_Is_1_26a16cf0",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceUnaryOperator_USub_UAdd_3_718d8a20",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_BitXor_13_2da1cc94",
+    "debugging_one_shot_flutes_log_py_core_ReplaceBinaryOperator_Add_RShift_0_fefc8cf2",
+    "debugging_one_shot_flutes_log_py_core_ReplaceBinaryOperator_Add_FloorDiv_0_ee4166e9",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_BitOr_14_1bf81c46",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_LShift_8_6c26ceb3",
+    "debugging_one_shot_flutes_log_py_core_NumberReplacer_1_9c1ef199",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceComparisonOperator_IsNot_Is_5_e97d49f1",
+    "debugging_one_shot_flutes_multiproc_py_core_NumberReplacer_15_d5441785",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_Pow_0_0841a060",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceComparisonOperator_Eq_Lt_1_5bc621b7",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceComparisonOperator_Lt_LtE_1_70628998",
+    "debugging_one_shot_flutes_multiproc_py_core_ReplaceComparisonOperator_NotEq_Is_0_f235abe1",
+    "debugging_one_shot_flutes_multiproc_py_core_AddNot_33_1c467902"
+  ],
+  "debugging_one_shot_flutils_317852b0": [
+    "debugging_one_shot_flutils_cmdutils_py_core_ReplaceBinaryOperator_Mod_FloorDiv_0_8ce620f1",
+    "debugging_one_shot_flutils_cmdutils_py_core_ReplaceBinaryOperator_Mod_Mul_0_a17962d9",
+    "debugging_one_shot_flutils_cmdutils_py_core_ReplaceComparisonOperator_Is_IsNot_1_bff7edb6",
+    "debugging_one_shot_flutils_namedtupleutils_py_core_ReplaceBinaryOperator_Mod_Div_0_bec8de36",
+    "debugging_one_shot_flutils_moduleutils_py_core_ReplaceComparisonOperator_Eq_GtE_4_b18937e0",
+    "debugging_one_shot_flutils_moduleutils_py_core_AddNot_26_e884a6ac",
+    "debugging_one_shot_flutils_setuputils_cfg_py_core_ReplaceFalseWithTrue_3_d47e9ef1"
+  ],
+  "debugging_one_shot_httpie_98cd3d9d": [
+    "debugging_one_shot_httpie_downloads_py_core_ReplaceBinaryOperator_Add_FloorDiv_9_b95014ec",
+    "debugging_one_shot_httpie_context_py_core_ReplaceUnaryOperator_Delete_Not_0_3d59b00d",
+    "debugging_one_shot_httpie_downloads_py_core_ReplaceBinaryOperator_Sub_Pow_6_a64e3ef9"
+  ],
+  "debugging_one_shot_pdir_b180f6b3": [
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_RShift_1_f7d287ae",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_Add_2_768607bb",
+    "debugging_one_shot_pdir_format_py_core_ZeroIterationForLoop_1_54f76ba2",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_Div_1_7797da81",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_LShift_2_94565d7a",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_RShift_0_2d086262",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_Mul_0_c92838c5",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_BitOr_0_0e0b53e4",
+    "debugging_one_shot_pdir_format_py_core_ReplaceBinaryOperator_Add_Mul_4_34568a49",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceComparisonOperator_Eq_IsNot_0_0b1594fb",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_FloorDiv_1_f093ff73",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_BitAnd_0_0ca42ed0",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_Pow_2_3e4e7376",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_BitXor_1_7e6d6ca0",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_BitOr_1_bbaa83d6",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_BitXor_0_a2c96846",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_LShift_1_23c34876",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceComparisonOperator_Eq_LtE_0_01ab6e6e",
+    "debugging_one_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_BitAnd_1_0da7f622"
+  ],
+  "debugging_one_shot_string_utils_63a45093": [
+    "debugging_one_shot_string_utils_generation_py_core_ReplaceBinaryOperator_Add_Mul_0_cd360fbf"
+  ],
+  "debugging_zero_shot_apimd_969a249c": [
+    "debugging_zero_shot_apimd_main_py_core_ReplaceComparisonOperator_Eq_Gt_2_828388fa",
+    "debugging_zero_shot_apimd_compiler_py_core_ReplaceUnaryOperator_USub_Not_2_d3925862",
+    "debugging_zero_shot_apimd_compiler_py_core_AddNot_0_6f245fc1",
+    "debugging_zero_shot_apimd_compiler_py_core_ReplaceBinaryOperator_Add_RShift_11_2b097686"
+  ],
+  "debugging_zero_shot_codetiming_227c8d6e": [
+    "debugging_zero_shot_codetiming_timer_py_core_NumberReplacer_0_6a13a1b4"
+  ],
+  "debugging_zero_shot_dataclasses_json_4cf30f5b": [],
+  "debugging_zero_shot_docstring_parser_8fbccb4d": [],
+  "debugging_zero_shot_flake8_5f067521": [
+    "debugging_zero_shot_flake8_options_manager_py_core_AddNot_25_6c65e08f",
+    "debugging_zero_shot_flake8_style_guide_py_core_ReplaceBinaryOperator_Add_Pow_0_61047bef",
+    "debugging_zero_shot_flake8_processor_py_core_ReplaceFalseWithTrue_2_46518c81",
+    "debugging_zero_shot_flake8_processor_py_core_AddNot_7_15ae5811",
+    "debugging_zero_shot_flake8_processor_py_core_ReplaceBinaryOperator_Mul_BitAnd_0_6038b550",
+    "debugging_zero_shot_flake8_checker_py_core_NumberReplacer_61_add356f1",
+    "debugging_zero_shot_flake8_processor_py_core_NumberReplacer_15_570f7e96",
+    "debugging_zero_shot_flake8_formatting_base_py_core_AddNot_8_7e236d37"
+  ],
+  "debugging_zero_shot_flutes_f4ef7273": [
+    "debugging_zero_shot_flutes_log_py_core_AddNot_0_a7d9f230",
+    "debugging_zero_shot_flutes_multiproc_py_core_ExceptionReplacer_0_265782f8",
+    "debugging_zero_shot_flutes_log_py_core_ReplaceComparisonOperator_IsNot_Is_0_920d33e5",
+    "debugging_zero_shot_flutes_multiproc_py_core_ReplaceComparisonOperator_Lt_Gt_1_7aa67406",
+    "debugging_zero_shot_flutes_run_py_core_ReplaceUnaryOperator_USub_Not_0_3b3dd051",
+    "debugging_zero_shot_flutes_multiproc_py_core_NumberReplacer_45_aa8e3a4a",
+    "debugging_zero_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Mul_BitXor_1_f79ba971",
+    "debugging_zero_shot_flutes_multiproc_py_core_ReplaceComparisonOperator_Lt_LtE_0_4cab79a3",
+    "debugging_zero_shot_flutes_log_py_core_ReplaceComparisonOperator_GtE_IsNot_0_5599800e",
+    "debugging_zero_shot_flutes_multiproc_py_core_NumberReplacer_10_3283de8c",
+    "debugging_zero_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Add_BitXor_0_2e9d90cc",
+    "debugging_zero_shot_flutes_multiproc_py_core_ReplaceBinaryOperator_Add_Mul_8_492731e0",
+    "debugging_zero_shot_flutes_log_py_core_ReplaceFalseWithTrue_0_774adca5",
+    "debugging_zero_shot_flutes_log_py_core_ReplaceComparisonOperator_GtE_Lt_0_9bba5093",
+    "debugging_zero_shot_flutes_log_py_core_ReplaceComparisonOperator_GtE_LtE_0_7639697a"
+  ],
+  "debugging_zero_shot_flutils_f26f1667": [
+    "debugging_zero_shot_flutils_moduleutils_py_core_ReplaceComparisonOperator_NotEq_Eq_2_dcb5757f",
+    "debugging_zero_shot_flutils_moduleutils_py_core_ReplaceComparisonOperator_Eq_Gt_4_5a600d8f",
+    "debugging_zero_shot_flutils_moduleutils_py_core_ReplaceBinaryOperator_Mod_RShift_6_aebf1e63"
+  ],
+  "debugging_zero_shot_httpie_efd7bdf2": [
+    "debugging_zero_shot_httpie_config_py_core_ReplaceBinaryOperator_Div_Add_2_a9b433d8",
+    "debugging_zero_shot_httpie_config_py_core_ReplaceBinaryOperator_Div_BitOr_3_3c0236e8",
+    "debugging_zero_shot_httpie_context_py_core_AddNot_1_da3d8b9c",
+    "debugging_zero_shot_httpie_config_py_core_ReplaceBinaryOperator_Div_BitAnd_4_4915a74b",
+    "debugging_zero_shot_httpie_context_py_core_ReplaceUnaryOperator_Delete_Not_0_12d35657",
+    "debugging_zero_shot_httpie_downloads_py_core_ReplaceBinaryOperator_Div_BitXor_0_637cf3e9",
+    "debugging_zero_shot_httpie_downloads_py_core_ReplaceBinaryOperator_Mul_Div_0_29c9378c",
+    "debugging_zero_shot_httpie_context_py_core_ReplaceComparisonOperator_Is_IsNot_1_8ba1b322"
+  ],
+  "debugging_zero_shot_pdir_9accf17a": [
+    "debugging_zero_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_BitOr_1_4af5cd04",
+    "debugging_zero_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_Mul_1_967ab5ea",
+    "debugging_zero_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_Pow_1_7cc2f59d",
+    "debugging_zero_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_RShift_1_ab290e2c",
+    "debugging_zero_shot_pdir_color_py_core_AddNot_1_85d9caf7",
+    "debugging_zero_shot_pdir_configuration_py_core_ReplaceBinaryOperator_Mod_LShift_1_586fb7ae"
+  ],
+  "debugging_zero_shot_string_utils_7854d648": [
+    "debugging_zero_shot_string_utils_generation_py_core_ReplaceBinaryOperator_Add_Mul_0_18a2104b"
+  ]
+}
