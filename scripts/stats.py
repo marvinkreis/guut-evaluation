@@ -71,7 +71,7 @@ from typing import (
     Callable,
     Set,
 )
-from scipy.stats import mannwhitneyu
+from scipy.stats import mannwhitneyu, tstd
 from collections import defaultdict
 
 import plotly.graph_objects as go
@@ -2604,7 +2604,7 @@ def plot_sum_cost_per_project_():
 
 @block
 @savefig
-def plot_sum_cost_per_project_with_avg_pynguin_cost():
+def plot_num_turns_per_project():
     plot_data = data.groupby(["preset", "project"])
     costs = [[plot_data.get_group((preset, project))["num_turns"].mean() for project in PROJECTS] for preset in PRESETS]
 
@@ -2683,6 +2683,62 @@ def plot_sum_cost_per_project_with_total_pynguin_cost():
 
 @block
 @savefig
+def plot_cost_per_mutant_with_total_pynguin_cost():
+    plot_data = data.groupby(["preset", "project"])
+    costs = [
+        [
+            plot_data.get_group((preset, project))["usage.cost"].sum() / len(plot_data.get_group((preset, project)))
+            for project in PROJECTS
+        ]
+        for preset in PRESETS
+    ]
+
+    # Add Pynguin costs
+
+    grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    pynguin_costs = []
+    for project in PROJECTS:
+        cost_for_project = 0
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            cost_for_project += group["TotalCost"].sum() / len(plot_data.get_group((PRESETS[0], project)))
+
+        pynguin_costs.append(cost_for_project)  # / get_num_pynguin_runs_per_project(project))
+    costs.append(pynguin_costs)
+
+    x = np.arange(len(PROJECTS)) * 6
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 6))
+
+    ax.bar(x=x, height=costs[0], color=cmap_colors[0], width=1)
+    ax.bar(x=x + 1, height=costs[1], color=cmap_colors[1], width=1)
+    ax.bar(x=x + 2, height=costs[2], color=cmap_colors[2], width=1)
+    ax.bar(x=x + 3, height=costs[3], color=cmap_colors[3], width=1)
+    ax.bar(x=x + 4, height=pynguin_costs, color=cmap_colors[4], width=1)
+    ax.set_xlim((-2, 60))
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x:.0f}{dollar}")
+
+    ax.set_xticks(x + 2)
+    ax.set_xticklabels(PROJECTS, rotation=90)
+    labels = PRESET_NAMES + ["Pynguin (total)"]
+    fig.legend(labels, loc=(0.1, 0.79))
+    ax.set_ylabel("Cost for each project")
+
+    plot_data = {}
+    for label, preset_values in zip(labels, costs):
+        plot_data[label] = {key: value for key, value in zip(PROJECTS, preset_values)}
+
+    return fig, plot_data
+
+
+# %% Plot mean cost per mutant and project as bars
+
+
+@block
+@savefig
 def plot_mean_cost_per_project():
     plot_data = data.groupby(["preset", "project"])
     mean_costs = [
@@ -2744,7 +2800,7 @@ def plot_num_tokens_per_mutant():
     ax.set_xticks(np.arange(4))
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
-    fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(0.0, 0.1))
+    fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(0.0, 0.095))
     ax.set_ylabel("Mean token usage per mutant")
 
     plot_data = {}
@@ -2788,12 +2844,29 @@ def plot_cost_per_mutant():
             )
         )
 
+    # Pynguin costs
+    # grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    # pynguin_cost = 0
+    # for project in PROJECTS:
+    #     if is_pynguin_project_excluded(project):
+    #         continue
+
+    #     cost_for_project = 0
+    #     for index in range(1, 31):
+    #         if is_pynguin_run_excluded(project, index):
+    #             continue
+
+    #         group = grouped_pynguin_data.get_group((project, index))
+    #         cost_for_project += group["TotalCost"].sum()
+    #     pynguin_cost += cost_for_project / len(data[data["preset"] == PRESETS[0]])
+    # handles = [ax.bar(x=[4], height=[pynguin_cost], color=cmap_colors[4])] + handles
+
     ax.yaxis.set_major_formatter(lambda x, pos: f"{x * 100:.1f}¢")
     ax.set_xticks(np.arange(4))
     ax.set_xticklabels(PRESET_NAMES, rotation=90)
     ax.set_ylabel("Mean cost per mutant")
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
-    fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(0.0, 0.1))
+    fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(0.0, 0.095))
 
     plot_data = {}
     for label, preset_values in zip(labels, values):
@@ -4030,6 +4103,24 @@ def plot_number_of_minimized_test_cases_distplot():
             ]
         )
 
+    @block
+    def mannwhiteneyu_test_diffs():
+        grouped_data = data.groupby(["preset", "project"])
+        unminimized_values = []
+        for preset in PRESETS:
+            num_tests_per_project = []
+
+            for project in PROJECTS:
+                group = grouped_data.get_group((preset, project))
+                num_tests_per_project.append(group["num_final_test_cases"].sum())
+
+            unminimized_values.append([int(n) for n in num_tests_per_project])
+        diffs = [
+            [1 - (min_val / unmin_val) for min_val, unmin_val in zip(min_vals, unmin_vals)]
+            for min_vals, unmin_vals in zip(values, unminimized_values)
+        ]
+        mannwhitneyu_test(diffs, labels, "mannwhitneyu_num_tests_reduction.csv")
+
     labels.append("Pynguin (individual)")
     values.append([len(s.tests_minimized_by_mutation_score.tests) for s in minimized_pynguin_test_suites.values()])
 
@@ -5046,11 +5137,11 @@ def count_all_tests():
 
 @block
 def count_pynguin_flaky_tests():
-    count = 0
+    count = {}
     for (project, index), flaky_tests in pynguin_flaky_tests_per_run.items():
         if not is_pynguin_run_excluded(project, index):
-            count += len(flaky_tests)
-    print(count)
+            count[project] = count.get(project, 0) + len(flaky_tests)
+    print(json.dumps(count, indent=4))
 
 
 @block
@@ -5262,6 +5353,9 @@ def plot_line_coverage_per_project_with_pynguin():
     fig.legend(labels, loc="upper right", framealpha=1, bbox_to_anchor=(1.23, 1))
     ax.set_ylabel("Line coverage for each project")
 
+    for label, vals in zip(labels, coverage_per_approach + [coverage_individual_pynguin, coverage_combined_pynguin]):
+        print(label, tstd([v for v in vals if v]))
+
     plot_data = {}
     for label, preset_values in zip(
         labels, coverage_per_approach + [coverage_individual_pynguin, coverage_combined_pynguin]
@@ -5298,3 +5392,76 @@ pynguin_data.groupby("mutant_id")["num_failing_tests"].sum().hist(bins=200)
 
 # %%
 data.groupby("mutant_id")["cosmic_ray_full.num_failing_tests"].sum().hist(bins=200)
+
+
+# %%
+
+
+@block
+def mannwhiteneyu_loc_reduction():
+    minimized_values = []
+    for preset, name in zip(PRESETS, PRESET_NAMES):
+        minimized_values.append(
+            [
+                sum(
+                    [
+                        loc_per_test[t]
+                        for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
+                    ]
+                )
+                for project in PROJECTS
+            ]
+        )
+
+    grouped_data = data.groupby(["preset", "project"])
+    unminimized_values = []
+    for preset in PRESETS:
+        num_loc_per_project = []
+
+        for project in PROJECTS:
+            group = grouped_data.get_group((preset, project))
+            num_loc_per_project.append(sum([loc_per_test.get(id) or 0 for id in group["escaped_long_id"]]))
+
+        unminimized_values.append([int(n) for n in num_loc_per_project])
+
+    diffs = [
+        [1 - (min_val / unmin_val) for min_val, unmin_val in zip(min_vals, unmin_vals)]
+        for min_vals, unmin_vals in zip(minimized_values, unminimized_values)
+    ]
+    mannwhitneyu_test(diffs, PRESET_NAMES, "mannwhitneyu_loc_reduction.csv")
+
+
+@block
+@savefig
+def mannwhitneyu_num_tests_reduction():
+    # Minimized test suites
+    minimized_values = []
+    for preset in PRESETS:
+        minimized_values.append(
+            [
+                sum(
+                    [
+                        num_cases_per_test[t]
+                        for t in minimized_test_suites[(preset, project)].tests_minimized_by_mutation_score[0]
+                    ]
+                )
+                for project in PROJECTS
+            ]
+        )
+
+    grouped_data = data.groupby(["preset", "project"])
+    unminimized_values = []
+    for preset in PRESETS:
+        num_tests_per_project = []
+
+        for project in PROJECTS:
+            group = grouped_data.get_group((preset, project))
+            num_tests_per_project.append(group["num_final_test_cases"].sum())
+
+        unminimized_values.append([int(n) for n in num_tests_per_project])
+
+    diffs = [
+        [1 - (min_val / unmin_val) for min_val, unmin_val in zip(min_vals, unmin_vals)]
+        for min_vals, unmin_vals in zip(minimized_values, unminimized_values)
+    ]
+    mannwhitneyu_test(diffs, PRESET_NAMES, "mannwhitneyu_num_tests_reduction.csv")
