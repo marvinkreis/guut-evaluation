@@ -2156,6 +2156,7 @@ def distribution_plot(
     gap: float = 0.0,
     formatter: Callable[[Any], str] | None = None,
     ax: Any | None = None,
+    dotsize: float = 2.5,
     **kwargs,
 ) -> None:
     """Draw a distribution plot, built of a boxplot and a stripplot.
@@ -2218,7 +2219,7 @@ def distribution_plot(
         order=order,
         orient=orient,
         palette=palette,
-        size=2.5,
+        size=dotsize,
         **kwargs,
     )
 
@@ -5465,3 +5466,171 @@ def mannwhitneyu_num_tests_reduction():
         for min_vals, unmin_vals in zip(minimized_values, unminimized_values)
     ]
     mannwhitneyu_test(diffs, PRESET_NAMES, "mannwhitneyu_num_tests_reduction.csv")
+
+
+# %% Presentation
+# ======================================================================================================================
+
+
+class ____Presentation:  # mark this in the outline
+    pass
+
+
+# %% Plot mean line coverage with Pynguin
+
+
+@block
+@savefig
+def plot_line_coverage_with_pynguin_distplot_presentation():
+    values = []
+    for preset in PRESETS:
+        num_covered = []
+        for project in PROJECTS:
+            num_covered.append(len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project]))
+            # print(
+            #     f"{len(coverage_map[(preset, project)].executed_lines) / len(all_seen_lines_map[project])} {preset} {project}"
+            # )
+        values.append(num_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = []
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        covered_lines_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_lines_per_project.update(coverage.executed_lines)
+
+        num_combined_pynguin_covered.append(len(covered_lines_per_project) / len(all_seen_lines_map[project]))
+    values.append(num_combined_pynguin_covered)
+
+    # All Pynguin runs
+    num_avg_pynguin_covered = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_avg_pynguin_covered.append(len(coverage.executed_lines) / len(all_seen_lines_map[project]))
+    values.append(num_avg_pynguin_covered)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4.66, 6.2))
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
+    distribution_plot(values, ax=ax, dotsize=4)
+
+    ax.set_xticks([])
+    ax.set_ylim((0, 1))
+
+    ax.set_yticks([x / 100 for x in range(0, 101, 20)])
+    ax.set_yticklabels([f"{x}%" for x in range(0, 101, 20)], fontsize=16)
+
+    return fig, {key: value for key, value in zip(labels, [sum(val) / len(val) for val in values])}
+
+
+# %% Plot mean branch coverage with Pynguin
+
+
+@block
+@savefig
+def plot_branch_coverage_with_pynguin_distplot_presentation():
+    values = []
+    for preset in PRESETS:
+        num_covered = []
+        for project in PROJECTS:
+            num_covered.append(
+                len(coverage_map[(preset, project)].executed_branches) / len(all_seen_branches_map[project])
+            )
+        values.append(num_covered)
+
+    # Pynguin combined runs
+    num_combined_pynguin_covered = []
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        covered_branches_per_project = set()
+
+        for index in range(1, 31):
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            covered_branches_per_project.update(coverage.executed_branches)
+
+        num_combined_pynguin_covered.append(len(covered_branches_per_project) / len(all_seen_branches_map[project]))
+    values.append(num_combined_pynguin_covered)
+
+    # All Pynguin runs
+    num_avg_pynguin_covered = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+            num_avg_pynguin_covered.append(len(coverage.executed_branches) / len(all_seen_branches_map[project]))
+    values.append(num_avg_pynguin_covered)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4.66, 6.2))
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
+    distribution_plot(values, ax=ax, dotsize=4)
+
+    # distribution_plot(values, ax=ax, dotsize=4, palette=["#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8a"])
+
+    ax.set_xticks([])
+    ax.set_ylim((0, 1))
+    ax.set_yticks([x / 100 for x in range(0, 101, 20)])
+    ax.set_yticklabels([f"{x}%" for x in range(0, 101, 20)], fontsize=16)
+
+    return fig, {key: value for key, value in zip(labels, [sum(val) / len(val) for val in values])}
+
+
+# %% Plot mutation score coverage with Pynguin
+
+
+@block
+@savefig
+def plot_mutation_score_with_pynguin_distplot_presentation():
+    grouped_data = data.groupby(["preset", "project"])
+    grouped_pynguin_data = pynguin_data.groupby(["project", "index"])
+
+    values = []
+    for preset in PRESETS:
+        killed_mutants = []
+        for project in PROJECTS:
+            group = grouped_data.get_group((preset, project))
+            killed_mutants.append(group["cosmic_ray_full.killed_by_own"].sum() / len(group))
+        values.append(killed_mutants)
+
+    # Pynguin combined runs
+    num_combined_pynguin = []
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        group = grouped_data.get_group((PRESETS[0], project))
+        num_combined_pynguin.append(group["pynguin.cosmic_ray.killed_by_any"].sum() / len(group))
+    values.append(num_combined_pynguin)
+
+    # All Pynguin runs
+    num_all_pynguin = []
+    for project in PROJECTS:
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            num_all_pynguin.append(group["killed"].sum() / len(group))
+    values.append(num_all_pynguin)
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(4.66, 6.2))
+    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
+    distribution_plot(values, ax=ax, dotsize=4)
+
+    ax.set_xticks([])
+    ax.set_ylim((0, 1))
+    ax.set_yticks([x / 100 for x in range(0, 101, 20)])
+    ax.set_yticklabels([f"{x}%" for x in range(0, 101, 20)], fontsize=16)
+
+    return fig, {key: value for key, value in zip(labels, [sum(val) / len(val) for val in values])}
