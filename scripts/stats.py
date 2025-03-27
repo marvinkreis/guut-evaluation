@@ -1623,7 +1623,9 @@ class ____Misc_Plots_And_Data:  # mark this in the outline
 
 
 cmap = cm.get_cmap("tab20")
+cmap_alt = cm.get_cmap("Set2")
 cmap_colors = cmap.colors  # pyright: ignore
+cmap_colors_alt = cmap_alt.colors  # pyright: ignore
 
 
 def string_colors(strings: Iterable[str], num_colors=10):
@@ -2057,6 +2059,7 @@ def plot_violin_per_group(
     col_name: str,
     col_fun: Callable[[Any], Any],
     customization: Callable[[Any, Any], None] | None = None,
+    colors: Iterable[Any] | None = None,
     **kwargs,
 ):
     values = [query_group(grouped_data, group_key, col_fun, [0]) for group_key, group_name in groups]
@@ -2074,9 +2077,9 @@ def plot_violin_per_group(
         vp.set_edgecolor("black")
         vp.set_linewidth(1)
 
-    color = (cmap_colors[0][0] * 0.8, cmap_colors[0][1] * 0.8, cmap_colors[0][2] * 0.8)
+    colors = colors or itertools.repeat((cmap_colors[0][0] * 0.8, cmap_colors[0][1] * 0.8, cmap_colors[0][2] * 0.8))
 
-    for vp in violin_parts["bodies"]:
+    for vp, color in zip(violin_parts["bodies"], colors):
         vp.set_facecolor(color)
         vp.set_edgecolor(color)
         vp.set_linewidth(1)
@@ -2803,6 +2806,7 @@ def plot_num_tokens_per_mutant():
     labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
     fig.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(0.0, 0.095))
     ax.set_ylabel("Mean token usage per mutant")
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{int(x / 1000):1d},000" if x else "0")
 
     plot_data = {}
     for label, preset_values in zip(labels, values):
@@ -3484,6 +3488,7 @@ def plot_num_turns():
         list(zip(PRESETS, PRESET_NAMES)),
         "Number of iterations",
         lambda df: df["num_turns"],
+        colors=["#045993", "#ff7f0e", "#2ca02c", "#d62728"],
     )
 
     plot_data = plot_data.transpose().to_dict()
@@ -3503,6 +3508,7 @@ def plot_num_turns_success():
         list(zip(PRESETS, PRESET_NAMES)),
         "Number of iterations",
         lambda df: df[df["mutant_killed"]]["num_turns"],
+        colors=["#045993", "#ff7f0e", "#2ca02c", "#d62728"],
     )
 
     plot_data = data[data["mutant_killed"]].groupby("preset")["num_turns"].agg(AGGS).transpose().to_dict()
@@ -5508,21 +5514,22 @@ def plot_line_coverage_with_pynguin_distplot_presentation():
     values.append(num_combined_pynguin_covered)
 
     # All Pynguin runs
-    num_avg_pynguin_covered = []
-    for project in PROJECTS:
-        for index in range(1, 31):
-            if is_pynguin_run_excluded(project, index):
-                continue
+    # num_avg_pynguin_covered = []
+    # for project in PROJECTS:
+    #     for index in range(1, 31):
+    #         if is_pynguin_run_excluded(project, index):
+    #             continue
 
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_avg_pynguin_covered.append(len(coverage.executed_lines) / len(all_seen_lines_map[project]))
-    values.append(num_avg_pynguin_covered)
+    #         coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+    #         num_avg_pynguin_covered.append(len(coverage.executed_lines) / len(all_seen_lines_map[project]))
+    # values.append(num_avg_pynguin_covered)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4.66, 6.2))
-    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
-    distribution_plot(values, ax=ax, dotsize=4)
+    labels = PRESET_NAMES + ["Pynguin (combined)"]
+    distribution_plot(values, ax=ax, dotsize=4, palette=[cmap_colors[i] for i in [0, 4, 2, 6, 8]])
 
-    ax.set_xticks([])
+    ax.set_xticks(list(range(len(labels))))
+    ax.set_xticklabels([""] * len(labels))
     ax.set_ylim((0, 1))
 
     ax.set_yticks([x / 100 for x in range(0, 101, 20)])
@@ -5562,23 +5569,24 @@ def plot_branch_coverage_with_pynguin_distplot_presentation():
     values.append(num_combined_pynguin_covered)
 
     # All Pynguin runs
-    num_avg_pynguin_covered = []
-    for project in PROJECTS:
-        for index in range(1, 31):
-            if is_pynguin_run_excluded(project, index):
-                continue
+    # num_avg_pynguin_covered = []
+    # for project in PROJECTS:
+    #     for index in range(1, 31):
+    #         if is_pynguin_run_excluded(project, index):
+    #             continue
 
-            coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
-            num_avg_pynguin_covered.append(len(coverage.executed_branches) / len(all_seen_branches_map[project]))
-    values.append(num_avg_pynguin_covered)
+    #         coverage = pynguin_coverage_map.get((project, index), EMPTY_COVERAGE)
+    #         num_avg_pynguin_covered.append(len(coverage.executed_branches) / len(all_seen_branches_map[project]))
+    # values.append(num_avg_pynguin_covered)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4.66, 6.2))
-    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
-    distribution_plot(values, ax=ax, dotsize=4)
+    labels = PRESET_NAMES + ["Pynguin (combined)"]
+    distribution_plot(values, ax=ax, dotsize=4, palette=[cmap_colors[i] for i in [0, 4, 2, 6, 8]])
 
     # distribution_plot(values, ax=ax, dotsize=4, palette=["#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8a"])
 
-    ax.set_xticks([])
+    ax.set_xticks(list(range(len(labels))))
+    ax.set_xticklabels([""] * len(labels))
     ax.set_ylim((0, 1))
     ax.set_yticks([x / 100 for x in range(0, 101, 20)])
     ax.set_yticklabels([f"{x}%" for x in range(0, 101, 20)], fontsize=16)
@@ -5614,23 +5622,434 @@ def plot_mutation_score_with_pynguin_distplot_presentation():
     values.append(num_combined_pynguin)
 
     # All Pynguin runs
-    num_all_pynguin = []
-    for project in PROJECTS:
-        for index in range(1, 31):
-            if is_pynguin_run_excluded(project, index):
-                continue
+    # num_all_pynguin = []
+    # for project in PROJECTS:
+    #     for index in range(1, 31):
+    #         if is_pynguin_run_excluded(project, index):
+    #             continue
 
-            group = grouped_pynguin_data.get_group((project, index))
-            num_all_pynguin.append(group["killed"].sum() / len(group))
-    values.append(num_all_pynguin)
+    #         group = grouped_pynguin_data.get_group((project, index))
+    #         num_all_pynguin.append(group["killed"].sum() / len(group))
+    # values.append(num_all_pynguin)
 
     fig, ax = plt.subplots(layout="constrained", figsize=(4.66, 6.2))
-    labels = PRESET_NAMES + ["Pynguin (combined)", "Pynguin (individual)"]
-    distribution_plot(values, ax=ax, dotsize=4)
+    labels = PRESET_NAMES + ["Pynguin (combined)"]
+    distribution_plot(values, ax=ax, dotsize=4, palette=[cmap_colors[i] for i in [0, 4, 2, 6, 8]])
 
-    ax.set_xticks([])
+    ax.set_xticks(list(range(len(labels))))
+    ax.set_xticklabels([""] * len(labels))
     ax.set_ylim((0, 1))
     ax.set_yticks([x / 100 for x in range(0, 101, 20)])
     ax.set_yticklabels([f"{x}%" for x in range(0, 101, 20)], fontsize=16)
 
     return fig, {key: value for key, value in zip(labels, [sum(val) / len(val) for val in values])}
+
+
+# %% Number of turns
+
+
+def presentation_customization(fig, ax):
+    ax.set_xticklabels([""] * 3)
+    ax.set_ylabel("")
+    ax.set_yticks(list(range(11)))
+    ax.set_yticklabels([str(x) for x in range(11)], fontsize=16)
+    fig.set_size_inches(4, 5)
+
+
+@block
+@savefig
+def plot_num_turns_presentation():
+    plot_data = data.groupby("preset")["num_turns"].agg(AGGS)
+    fig = plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS[1:], PRESET_NAMES[1:])),
+        "Number of iterations",
+        lambda df: df["num_turns"],
+        colors=["#2ca02c", "#ff7f0e", "#d62728"],
+        customization=presentation_customization,
+    )
+
+    plot_data = plot_data.transpose().to_dict()
+    preset_to_names = {preset: name for preset, name in zip(PRESETS, PRESET_NAMES)}
+    plot_data = {preset_to_names[preset]: values for preset, values in plot_data.items()}
+    return fig, plot_data
+
+
+# %% Number of turns for a successful test
+
+
+@block
+@savefig
+def plot_num_turns_success_presentation():
+    fig = plot_violin_per_group(
+        data.groupby("preset"),
+        list(zip(PRESETS[1:], PRESET_NAMES[1:])),
+        "Number of iterations",
+        lambda df: df[df["mutant_killed"]]["num_turns"],
+        colors=["#2ca02c", "#ff7f0e", "#d62728"],
+        customization=presentation_customization,
+    )
+
+    plot_data = data[data["mutant_killed"]].groupby("preset")["num_turns"].agg(AGGS).transpose().to_dict()
+    preset_to_names = {preset: name for preset, name in zip(PRESETS, PRESET_NAMES)}
+    plot_data = {preset_to_names[preset]: values for preset, values in plot_data.items()}
+    return fig, plot_data
+
+
+# %% Plot mean num tokens per mutant
+
+
+@block
+@savefig
+def plot_num_tokens_per_mutant_presentation():
+    grouped_data = data.groupby("preset")
+    values = [
+        [grouped_data.get_group(preset)[col].mean() for preset in PRESETS]
+        for col in [
+            "usage.cached_tokens",
+            "usage.uncached_prompt_tokens",
+            "usage.completion_tokens",
+        ]
+    ]
+
+    colors = [
+        cmap_colors[1],
+        cmap_colors[0],
+        cmap_colors[2],
+    ]
+    fig, ax = plt.subplots(layout="constrained", figsize=(9, 3.5))
+    handles = []
+    for i in range(len(values)):
+        handles.append(
+            ax.barh(
+                y=np.arange(4),
+                left=np.sum(values[:i], axis=0),
+                width=values[i],
+                color=colors[i],
+            )
+        )
+
+    ax.set_yticks(np.arange(4))
+    ax.set_yticklabels(PRESET_NAMES, fontsize=22)
+    ax.set_xticks([x * 15000 for x in range(6)])
+    ax.set_xticklabels([f"{x * 15},000" if x else "0" for x in range(6)], fontsize=18)
+    labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
+
+    return fig
+
+
+# %% Plot mean cost for one mutant
+
+
+@block
+@savefig
+def plot_cost_per_mutant_presentation():
+    grouped_data = data.groupby("preset")
+    values = [
+        [grouped_data.get_group(preset)[col].mean() for preset in PRESETS]
+        for col in [
+            "usage.cost.cached_tokens",
+            "usage.cost.uncached_prompt_tokens",
+            "usage.cost.completion_tokens",
+        ]
+    ]
+
+    colors = [
+        cmap_colors[1],
+        cmap_colors[0],
+        cmap_colors[2],
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(9, 3.5))
+    handles = []
+    for i in range(len(values)):
+        handles.append(
+            ax.barh(
+                y=np.arange(4),
+                left=np.sum(values[:i], axis=0),
+                width=values[i],
+                color=colors[i],
+            )
+        )
+
+    # Pynguin costs
+    # grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    # pynguin_cost = 0
+    # for project in PROJECTS:
+    #     if is_pynguin_project_excluded(project):
+    #         continue
+
+    #     cost_for_project = 0
+    #     for index in range(1, 31):
+    #         if is_pynguin_run_excluded(project, index):
+    #             continue
+
+    #         group = grouped_pynguin_data.get_group((project, index))
+    #         cost_for_project += group["TotalCost"].sum()
+    #     pynguin_cost += cost_for_project / len(data[data["preset"] == PRESETS[0]])
+    # handles = [ax.bar(x=[4], height=[pynguin_cost], color=cmap_colors[4])] + handles
+
+    ax.set_xticks([x / 1000 for x in range(9)])
+    ax.set_xticklabels([f"{x / 10:.01f}¢" for x in range(9)], fontsize=18)
+    ax.set_yticks(np.arange(4))
+    ax.set_yticklabels(PRESET_NAMES, fontsize=22)
+
+    labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
+
+    return fig
+
+
+# %% Plot mean cost for one project
+
+
+@block
+@savefig
+def plot_cost_per_project_presentation():
+    cols = [
+        "usage.cost.cached_tokens",
+        "usage.cost.uncached_prompt_tokens",
+        "usage.cost.completion_tokens",
+    ]
+    grouped_data = data[cols + ["preset", "project"]].groupby(["preset", "project"]).sum().groupby("preset")
+    values = [
+        [grouped_data.get_group(preset)[col].mean() for preset in PRESETS]
+        for col in [
+            "usage.cost.cached_tokens",
+            "usage.cost.uncached_prompt_tokens",
+            "usage.cost.completion_tokens",
+        ]
+    ]
+
+    colors = [
+        cmap_colors[1],
+        cmap_colors[0],
+        cmap_colors[2],
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(9, 3.5))
+    handles = []
+    for i in range(len(values)):
+        handles.append(
+            ax.barh(
+                y=np.arange(4) + 1,
+                left=np.sum(values[:i], axis=0),
+                width=values[i],
+                color=colors[i],
+            )
+        )
+
+    # Pynguin costs
+    grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    pynguin_total_cost_per_project = []
+    for project in PROJECTS:
+        if is_pynguin_project_excluded(project):
+            continue
+
+        cost_for_project = 0
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            cost_for_project += group["TotalCost"].sum()
+        pynguin_total_cost_per_project.append(cost_for_project)
+    handles = [
+        ax.barh(
+            y=[0],
+            width=[sum(pynguin_total_cost_per_project) / len(pynguin_total_cost_per_project)],
+            color=cmap_colors[8],
+        )
+    ] + handles
+
+    ax.set_xticks([x for x in range(7)])
+    ax.set_xticklabels([f"{x}$" for x in range(7)], fontsize=18)
+    ax.set_yticks(np.arange(5))
+    ax.set_yticklabels(["Pynguin"] + PRESET_NAMES, fontsize=22)
+
+    labels = ["Prompt tokens (cached)", "Prompt tokens (uncached)", "Completion tokens"]
+
+    return fig
+
+
+# %% Plot total cost per preset and project as bars
+
+
+@block
+@savefig
+def plot_sum_cost_per_project_with_total_pynguin_cost_presentation():
+    plot_data = data.groupby(["preset", "project"])
+    costs = [[plot_data.get_group((preset, project))["usage.cost"].sum() for project in PROJECTS] for preset in PRESETS]
+
+    # Add Pynguin costs
+
+    grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    pynguin_costs = []
+    for project in PROJECTS:
+        cost_for_project = 0
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            cost_for_project += group["TotalCost"].sum()
+
+        pynguin_costs.append(cost_for_project)  # / get_num_pynguin_runs_per_project(project))
+    costs.append(pynguin_costs)
+
+    x = np.arange(len(PROJECTS)) * 6
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 6))
+
+    ax.bar(x=x, height=costs[0], color=cmap_colors[0], width=1)
+    ax.bar(x=x + 1, height=costs[1], color=cmap_colors[1], width=1)
+    ax.bar(x=x + 2, height=costs[2], color=cmap_colors[2], width=1)
+    ax.bar(x=x + 3, height=costs[3], color=cmap_colors[3], width=1)
+    ax.bar(x=x + 4, height=pynguin_costs, color=cmap_colors[4], width=1)
+    ax.set_xlim((-2, 60))
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x:.0f}{dollar}")
+
+    ax.set_xticks(x + 2)
+    ax.set_xticklabels(PROJECTS, rotation=90, fontsize=13)
+    labels = PRESET_NAMES + ["Pynguin (total)"]
+
+    ax.set_yticks([x * 2 for x in range(6)])
+    ax.set_yticklabels([f"{x * 2}$" for x in range(6)], fontsize=18)
+
+    plot_data = {}
+    for label, preset_values in zip(labels, costs):
+        plot_data[label] = {key: value for key, value in zip(PROJECTS, preset_values)}
+
+    return fig, plot_data
+
+
+# %% Plot percentage of full outcomes
+
+
+@block
+@savefig
+def plot_full_outcomes_presentation():
+    grouped_data = data.groupby("preset")
+    values = [
+        [(grouped_data.get_group(preset)["full_outcome"] == outcome).mean() for preset in PRESETS]
+        for outcome in FULL_OUTCOMES
+    ]
+    colors = [
+        cmap_colors[4],
+        cmap_colors[3],
+        cmap_colors[2],
+        cmap_colors[6],
+    ]
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(8, 3))
+    handles = []
+    for i in range(len(values)):
+        handles.append(
+            ax.barh(
+                y=np.arange(4),
+                left=np.sum(values[:i], axis=0),
+                width=values[i],
+                color=colors[i],
+            )
+        )
+
+    ax.xaxis.set_major_formatter(format_perecent())
+    ax.set_yticks(np.arange(4))
+    ax.set_yticklabels(PRESET_NAMES, fontsize=22)
+    ax.set_xticks([x / 5 for x in range(6)])
+    ax.set_xticklabels([f"{x * 20}%" for x in range(6)], fontsize=18)
+    labels = FULL_OUTCOME_NAMES
+
+    return fig
+
+
+# %% Plot Number of Iterations
+
+
+@block
+@savefig
+def plot_number_of_kills_per_iteration_limit_presentation():
+    fig, ax = plt.subplots(layout="constrained", figsize=(6, 4))
+    ax.set_xlim(1, 10)
+
+    for axis in ["top", "bottom", "left", "right"]:
+        ax.spines[axis].set_linewidth(1)
+
+    for preset, name, color in zip(PRESETS[1:], PRESET_NAMES[1:], [cmap_colors[i] for i in [4, 2, 6]]):
+        info = stats_per_iteration_limit[preset]
+        if preset == "baseline_without_iterations":
+            continue
+
+        ax.plot([i.iterations for i in info], [len(i.kills) for i in info], label=f"{name}", color=color, linewidth=4)
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.set_ylabel("Number of killed mutants", fontsize=18)
+    ax.set_xlabel("Number of allowed iterations", fontsize=18)
+    ax.set_xticks(list(range(1, 11)))
+    ax.set_xticklabels(list(str(x) for x in range(1, 11)), fontsize=16)
+    ax.set_yticks(list(range(0, 4001, 500)))
+    ax.set_yticklabels(list(str(x) for x in range(0, 4001, 500)), fontsize=16)
+
+    return fig
+
+
+# %% Plot total cost per preset and project as bars
+
+
+@block
+@savefig
+def plot_sum_cost_per_project_with_total_pynguin_cost_presentation():
+    plot_data = data.groupby(["preset", "project"])
+    costs = [[plot_data.get_group((preset, project))["usage.cost"].sum() for project in PROJECTS] for preset in PRESETS]
+
+    # Add Pynguin costs
+
+    grouped_pynguin_data = raw_pynguin_data.groupby(["Project", "Index"])
+    pynguin_costs = []
+    for project in PROJECTS:
+        cost_for_project = 0
+        for index in range(1, 31):
+            if is_pynguin_run_excluded(project, index):
+                continue
+
+            group = grouped_pynguin_data.get_group((project, index))
+            cost_for_project += group["TotalCost"].sum()
+
+        pynguin_costs.append(cost_for_project)  # / get_num_pynguin_runs_per_project(project))
+    costs.append(pynguin_costs)
+
+    x = np.arange(len(PROJECTS)) * 6
+
+    fig, ax = plt.subplots(layout="constrained", figsize=(10, 7))
+
+    ax.bar(x=x, height=costs[0], color=cmap_colors[0], width=0.9)
+    ax.bar(x=x + 1, height=costs[1], color=cmap_colors[4], width=0.9)
+    ax.bar(x=x + 2, height=costs[2], color=cmap_colors[2], width=0.9)
+    ax.bar(x=x + 3, height=costs[3], color=cmap_colors[6], width=0.9)
+    ax.bar(x=x + 4, height=pynguin_costs, color=cmap_colors[8], width=0.9)
+    ax.set_xlim((-2, 60))
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x:.0f}{dollar}")
+    ax.set_yticks(list(range(0, 11, 2)))
+    ax.set_yticklabels([f"{x}$" for x in range(0, 11, 2)], fontsize=18)
+
+    ax.set_xticks(x + 2)
+    ax.set_xticklabels(PROJECTS, rotation=90, fontsize=14)
+    labels = PRESET_NAMES + ["Pynguin (total)"]
+
+    plot_data = {}
+    for label, preset_values in zip(labels, costs):
+        plot_data[label] = {key: value for key, value in zip(PROJECTS, preset_values)}
+
+    return fig, plot_data
+
+
+# %%
+
+
+@block
+def find_tests():
+    killed_mutants = set(data[data["cosmic_ray_full.killed_by_any"]]["mutant_id"])
+    killed_pynguin_mutants = set(pynguin_data[pynguin_data["killed"]]["mutant_id"])
+    pynguin_specific_kills = killed_pynguin_mutants - killed_mutants
+    guut_specific_kills = killed_mutants - killed_pynguin_mutants
+    print(f"Pynguin-specific kills: {len(pynguin_specific_kills)}")
+    print(f"Guut-specific kills: {len(guut_specific_kills)}")
